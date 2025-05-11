@@ -25,7 +25,11 @@
 
 ## 预览
 
-![PicUI界面预览](https://via.placeholder.com/800x450.png?text=PicUI+界面预览)
+### 上传界面
+![上传界面](./1.png)
+
+### 上传成功界面
+![上传成功界面](./2.png)
 
 ## 快速开始
 
