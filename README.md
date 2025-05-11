@@ -82,7 +82,11 @@ docker run -d -p 8000:8000 -v $(pwd)/uploads:/app/uploads --name picui picui
 
 ### 云平台部署
 
-详细的云平台部署指南请查看 [README_DEPLOY.md](README_DEPLOY.md)。
+详细的云平台部署指南请查看 [云平台部署指南.md](云平台部署指南.md)。
+
+### 服务器部署
+
+完整的服务器部署说明（Ubuntu和Windows）请查看 [服务器部署指南.md](服务器部署指南.md)。
 
 ## 技术栈
 
@@ -95,19 +99,23 @@ docker run -d -p 8000:8000 -v $(pwd)/uploads:/app/uploads --name picui picui
 
 ```
 picui/
-├── main.py            # FastAPI应用主文件
-├── database.py        # 数据库模型和配置
-├── static/            # 静态文件
-│   └── index.html     # 前端上传页面
-├── uploads/           # 上传文件存储目录
-├── requirements.txt   # 项目依赖
-├── Dockerfile         # Docker配置
-└── README.md          # 项目文档
+├── main.py                # FastAPI应用主文件
+├── database.py            # 数据库模型和配置
+├── static/                # 静态文件
+│   └── index.html         # 前端上传页面
+├── uploads/               # 上传文件存储目录
+├── requirements.txt       # 项目依赖
+├── Dockerfile             # Docker配置
+├── README.md              # 项目文档
+├── 服务器部署指南.md      # 服务器部署文档
+├── 云平台部署指南.md      # 云平台部署文档
+├── GitHub设置指南.md      # GitHub设置文档
+└── 贡献指南.md            # 贡献指南
 ```
 
 ## 贡献指南
 
-欢迎贡献代码或提出建议，请查看 [CONTRIBUTING.md](CONTRIBUTING.md) 了解详情。
+欢迎贡献代码或提出建议，请查看 [贡献指南.md](贡献指南.md) 了解详情。
 
 ## 许可证
 
