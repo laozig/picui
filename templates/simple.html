@@ -1,0 +1,244 @@
+<!DOCTYPE html>
+<html>
+<head>
+    <meta charset="utf-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>PicUI简易图床</title>
+    <style>
+        body {
+            font-family: 'Segoe UI', Tahoma, Geneva, Verdana, sans-serif;
+            margin: 0;
+            padding: 0;
+            background-color: #f5f5f5;
+            color: #333;
+        }
+        header {
+            background-color: #3498db;
+            color: white;
+            padding: 20px;
+            text-align: center;
+        }
+        .container {
+            max-width: 800px;
+            margin: 0 auto;
+            padding: 20px;
+        }
+        .card {
+            background-color: white;
+            border-radius: 5px;
+            box-shadow: 0 2px 5px rgba(0,0,0,0.1);
+            padding: 20px;
+            margin-bottom: 20px;
+        }
+        h1, h2 {
+            margin-top: 0;
+        }
+        .upload-form {
+            display: flex;
+            flex-direction: column;
+            gap: 15px;
+        }
+        .upload-btn {
+            padding: 10px 15px;
+            background-color: #3498db;
+            color: white;
+            border: none;
+            border-radius: 3px;
+            cursor: pointer;
+            font-size: 16px;
+        }
+        .upload-btn:hover {
+            background-color: #2980b9;
+        }
+        .result {
+            display: none;
+            margin-top: 20px;
+        }
+        .preview-img {
+            max-width: 100%;
+            max-height: 300px;
+            margin-bottom: 15px;
+            border: 1px solid #ddd;
+        }
+        .url-group {
+            margin-bottom: 10px;
+        }
+        .url-label {
+            display: block;
+            margin-bottom: 5px;
+            font-weight: bold;
+        }
+        .url-input {
+            width: 100%;
+            padding: 8px;
+            border: 1px solid #ddd;
+            border-radius: 3px;
+            box-sizing: border-box;
+            font-family: monospace;
+        }
+        .footer {
+            text-align: center;
+            padding: 20px;
+            background-color: #333;
+            color: white;
+        }
+        .drag-area {
+            border: 2px dashed #3498db;
+            padding: 30px;
+            text-align: center;
+            border-radius: 5px;
+            margin-bottom: 15px;
+        }
+        .drag-area.active {
+            border-color: #27ae60;
+            background-color: rgba(39, 174, 96, 0.1);
+        }
+        .error {
+            color: #e74c3c;
+            margin-top: 10px;
+            display: none;
+        }
+    </style>
+</head>
+<body>
+    <header>
+        <h1>PicUI简易图床</h1>
+        <p>快速、简单的图片上传服务</p>
+    </header>
+    <div class="container">
+        <div class="card">
+            <h2>上传图片</h2>
+            <div class="drag-area" id="drag-area">
+                <p>拖放图片到这里，或</p>
+                <input type="file" id="file-input" accept="image/*" style="display: none;">
+                <button class="upload-btn" onclick="document.getElementById('file-input').click()">选择图片</button>
+            </div>
+            <div class="error" id="error-message"></div>
+            <div class="result" id="result">
+                <h3>上传成功！</h3>
+                <img id="preview-img" class="preview-img" src="" alt="预览">
+                
+                <div class="url-group">
+                    <span class="url-label">直接链接：</span>
+                    <input type="text" id="direct-url" class="url-input" readonly>
+                </div>
+                
+                <div class="url-group">
+                    <span class="url-label">HTML代码：</span>
+                    <input type="text" id="html-code" class="url-input" readonly>
+                </div>
+                
+                <div class="url-group">
+                    <span class="url-label">Markdown代码：</span>
+                    <input type="text" id="md-code" class="url-input" readonly>
+                </div>
+                
+                <button class="upload-btn" onclick="resetUpload()">上传另一张</button>
+            </div>
+        </div>
+    </div>
+    <div class="footer">
+        <p>PicUI简易图床 &copy; 2023</p>
+    </div>
+
+    <script>
+        const dragArea = document.getElementById('drag-area');
+        const fileInput = document.getElementById('file-input');
+        const resultDiv = document.getElementById('result');
+        const errorDiv = document.getElementById('error-message');
+        
+        // 拖放处理
+        dragArea.addEventListener('dragover', (e) => {
+            e.preventDefault();
+            dragArea.classList.add('active');
+        });
+        
+        dragArea.addEventListener('dragleave', () => {
+            dragArea.classList.remove('active');
+        });
+        
+        dragArea.addEventListener('drop', (e) => {
+            e.preventDefault();
+            dragArea.classList.remove('active');
+            
+            if (e.dataTransfer.files.length) {
+                fileInput.files = e.dataTransfer.files;
+                uploadFile(e.dataTransfer.files[0]);
+            }
+        });
+        
+        // 文件选择处理
+        fileInput.addEventListener('change', () => {
+            if (fileInput.files.length) {
+                uploadFile(fileInput.files[0]);
+            }
+        });
+        
+        // 上传文件
+        function uploadFile(file) {
+            // 隐藏之前的错误
+            errorDiv.style.display = 'none';
+            
+            // 检查是否为图片
+            if (!file.type.startsWith('image/')) {
+                showError('只能上传图片文件');
+                return;
+            }
+            
+            const formData = new FormData();
+            formData.append('file', file);
+            
+            fetch('/upload', {
+                method: 'POST',
+                body: formData
+            })
+            .then(response => {
+                if (!response.ok) {
+                    return response.json().then(err => {
+                        throw new Error(err.detail || '上传失败');
+                    });
+                }
+                return response.json();
+            })
+            .then(data => {
+                // 显示结果
+                document.getElementById('preview-img').src = data.url;
+                document.getElementById('direct-url').value = data.url;
+                document.getElementById('html-code').value = data.html_code;
+                document.getElementById('md-code').value = data.markdown_code;
+                
+                dragArea.style.display = 'none';
+                resultDiv.style.display = 'block';
+            })
+            .catch(error => {
+                showError(error.message);
+            });
+        }
+        
+        // 显示错误
+        function showError(message) {
+            errorDiv.textContent = message;
+            errorDiv.style.display = 'block';
+        }
+        
+        // 重置上传界面
+        function resetUpload() {
+            dragArea.style.display = 'block';
+            resultDiv.style.display = 'none';
+            fileInput.value = '';
+        }
+        
+        // 简化复制功能
+        document.querySelectorAll('.url-input').forEach(input => {
+            input.addEventListener('click', function() {
+                this.select();
+                try {
+                    document.execCommand('copy');
+                } catch (err) {
+                    console.error('无法复制', err);
+                }
+            });
+        });
+    </script>
+</body>
+</html> 

@@ -112,6 +112,16 @@ test_upload.py
 test_main.py
 simple_test.py
 auto_fix.py
+conftest.py
+mock_*.py
+_trial_temp/
+testdb/
+*.profile
+testdata.*
+test_output/
+test-results/
+cov.*
+coverage/
 
 # 部署相关
 deploy/credentials/

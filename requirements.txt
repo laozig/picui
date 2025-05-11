@@ -3,13 +3,22 @@ uvicorn==0.23.2
 python-multipart==0.0.6
 aiofiles==23.1.0
 sqlalchemy==2.0.40
-pytest==7.4.0
-pytest-cov==4.1.0
-httpx==0.24.1
 bcrypt==4.0.1
 pyotp==2.9.0
-qrcode==7.4.2
-requests==2.31.0
+qrcode>=7.4.2
+requests>=2.31.0
 Pillow==10.1.0
 numpy==1.24.4
-prometheus-client==0.17.1
+prometheus-client==0.21.1
+Jinja2==3.1.6
+pydantic==2.10.6
+httpx==0.24.1
+
+# 以下包为可选包，如果安装失败可以忽略
+# python-dotenv - 用于加载.env环境变量文件
+# psutil - 用于系统监控（目前未使用）
+# concurrent-log-handler - 用于日志处理（目前未使用）
+
+# 测试依赖，仅在开发环境需要
+# pytest>=7.4.0
+# pytest-cov>=4.1.0

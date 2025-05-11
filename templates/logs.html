@@ -1,162 +1,398 @@
 <!DOCTYPE html>
-<html lang="zh-CN">
+<html lang="zh-CN" data-theme="dark">
 <head>
-    <meta charset="UTF-8">
+    <meta charset="utf-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
-    <title>上传日志 - PicUI图床</title>
-    <link href="https://cdn.bootcdn.net/ajax/libs/tailwindcss/2.2.19/tailwind.min.css" rel="stylesheet">
-    <link rel="stylesheet" href="https://cdn.bootcdn.net/ajax/libs/font-awesome/5.15.4/css/all.min.css">
+    <title>上传日志 - PicUI图床服务</title>
     <style>
-        .pagination a {
+        :root {
+            --font-family: 'Segoe UI', Tahoma, Geneva, Verdana, sans-serif;
+            
+            /* Light Mode (Default) */
+            --background-color: #f5f5f5;
+            --card-background: #ffffff;
+            --header-bg: #3498db;
+            --header-color: #ffffff;
+            --text-color: #333333;
+            --button-bg: #3498db;
+            --button-color: #ffffff;
+            --button-hover-bg: #2980b9;
+            --footer-bg: #333333;
+            --footer-color: #ffffff;
+            --border-color: #dddddd;
+            --table-header-bg: #f0f0f0;
+            --table-row-even: #f9f9f9;
+            --table-border: #dddddd;
+            --success-color: #27ae60;
+            --failed-color: #e74c3c;
+            --deleted-color: #f39c12;
+        }
+
+        [data-theme="dark"] {
+            --background-color: #1a1a1a;
+            --card-background: #2d2d2d;
+            --header-bg: #2c3e50;
+            --header-color: #ecf0f1;
+            --text-color: #ecf0f1;
+            --button-bg: #2980b9;
+            --button-color: #ecf0f1;
+            --button-hover-bg: #3498db;
+            --footer-bg: #2c3e50;
+            --footer-color: #ecf0f1;
+            --border-color: #444444;
+            --table-header-bg: #2c3e50;
+            --table-row-even: #333333;
+            --table-border: #444444;
+            --success-color: #27ae60;
+            --failed-color: #e74c3c;
+            --deleted-color: #f39c12;
+        }
+
+        [data-theme="blue"] {
+            --background-color: #e3f2fd;
+            --card-background: #ffffff;
+            --header-bg: #1976d2;
+            --header-color: #ffffff;
+            --text-color: #0d47a1;
+            --button-bg: #1976d2;
+            --button-color: #ffffff;
+            --button-hover-bg: #1565c0;
+            --footer-bg: #0d47a1;
+            --footer-color: #ffffff;
+            --border-color: #bbdefb;
+            --table-header-bg: #bbdefb;
+            --table-row-even: #e3f2fd;
+            --table-border: #bbdefb;
+            --success-color: #00c853;
+            --failed-color: #d50000;
+            --deleted-color: #ff6d00;
+        }
+
+        [data-theme="green"] {
+            --background-color: #e8f5e9;
+            --card-background: #ffffff;
+            --header-bg: #388e3c;
+            --header-color: #ffffff;
+            --text-color: #1b5e20;
+            --button-bg: #388e3c;
+            --button-color: #ffffff;
+            --button-hover-bg: #2e7d32;
+            --footer-bg: #1b5e20;
+            --footer-color: #ffffff;
+            --border-color: #c8e6c9;
+            --table-header-bg: #c8e6c9;
+            --table-row-even: #e8f5e9;
+            --table-border: #c8e6c9;
+            --success-color: #00c853;
+            --failed-color: #d50000;
+            --deleted-color: #ff6d00;
+        }
+
+        [data-theme="purple"] {
+            --background-color: #f3e5f5;
+            --card-background: #ffffff;
+            --header-bg: #7b1fa2;
+            --header-color: #ffffff;
+            --text-color: #4a148c;
+            --button-bg: #7b1fa2;
+            --button-color: #ffffff;
+            --button-hover-bg: #6a1b9a;
+            --footer-bg: #4a148c;
+            --footer-color: #ffffff;
+            --border-color: #e1bee7;
+            --table-header-bg: #e1bee7;
+            --table-row-even: #f3e5f5;
+            --table-border: #e1bee7;
+            --success-color: #00c853;
+            --failed-color: #d50000;
+            --deleted-color: #ff6d00;
+        }
+
+        body {
+            font-family: var(--font-family);
+            margin: 0;
+            padding: 0;
+            background-color: var(--background-color);
+            color: var(--text-color);
+            transition: all 0.3s ease;
+        }
+        
+        header {
+            background-color: var(--header-bg);
+            color: var(--header-color);
+            padding: 20px;
+            text-align: center;
+            position: relative;
+        }
+        
+        .container {
+            max-width: 1200px;
+            margin: 0 auto;
+            padding: 20px;
+        }
+        
+        .card {
+            background-color: var(--card-background);
+            border-radius: 8px;
+            box-shadow: 0 2px 8px rgba(0,0,0,0.1);
+            padding: 20px;
+            margin-bottom: 20px;
+            border: 1px solid var(--border-color);
+            overflow-x: auto;
+        }
+        
+        h1, h2 {
+            margin-top: 0;
+        }
+        
+        .btn {
             display: inline-block;
-            padding: 0.5rem 1rem;
-            margin: 0 0.25rem;
-            border-radius: 0.25rem;
+            padding: 10px 15px;
+            background-color: var(--button-bg);
+            color: var(--button-color);
+            text-decoration: none;
+            border-radius: 4px;
+            margin-right: 10px;
+            margin-bottom: 10px;
+            border: none;
+            cursor: pointer;
+            transition: background-color 0.3s ease;
         }
-
-        .pagination a.active {
-            background-color: #4F46E5;
-            color: white;
+        
+        .btn:hover {
+            background-color: var(--button-hover-bg);
         }
-
-        .pagination a:hover:not(.active) {
-            background-color: #E5E7EB;
+        
+        .footer {
+            text-align: center;
+            padding: 20px;
+            background-color: var(--footer-bg);
+            color: var(--footer-color);
+        }
+        
+        .theme-selector {
+            position: absolute;
+            top: 10px;
+            right: 10px;
+            display: flex;
+            gap: 8px;
+        }
+        
+        .theme-btn {
+            width: 24px;
+            height: 24px;
+            border-radius: 50%;
+            border: 2px solid rgba(255,255,255,0.7);
+            cursor: pointer;
+            transition: transform 0.2s ease;
+        }
+        
+        .theme-btn:hover {
+            transform: scale(1.1);
+        }
+        
+        .theme-btn.light {
+            background-color: #f5f5f5;
+        }
+        
+        .theme-btn.dark {
+            background-color: #1a1a1a;
+        }
+        
+        .theme-btn.blue {
+            background-color: #1976d2;
+        }
+        
+        .theme-btn.green {
+            background-color: #388e3c;
+        }
+        
+        .theme-btn.purple {
+            background-color: #7b1fa2;
+        }
+        
+        table {
+            width: 100%;
+            border-collapse: collapse;
+            margin-top: 20px;
+        }
+        
+        th, td {
+            padding: 10px;
+            text-align: left;
+            border: 1px solid var(--table-border);
+        }
+        
+        th {
+            background-color: var(--table-header-bg);
+            font-weight: bold;
+        }
+        
+        tr:nth-child(even) {
+            background-color: var(--table-row-even);
+        }
+        
+        .success {
+            color: var(--success-color);
+        }
+        
+        .failed {
+            color: var(--failed-color);
+        }
+        
+        .deleted {
+            color: var(--deleted-color);
+        }
+        
+        .pagination {
+            display: flex;
+            list-style: none;
+            padding: 0;
+            justify-content: center;
+            margin: 20px 0;
+        }
+        
+        .pagination li {
+            margin: 0 5px;
+        }
+        
+        .pagination a {
+            padding: 8px 12px;
+            background-color: var(--button-bg);
+            color: var(--button-color);
+            text-decoration: none;
+            border-radius: 4px;
+            transition: background-color 0.3s ease;
+        }
+        
+        .pagination a:hover {
+            background-color: var(--button-hover-bg);
+        }
+        
+        .pagination .active a {
+            background-color: var(--button-hover-bg);
+            cursor: default;
+        }
+        
+        .pagination .disabled a {
+            background-color: var(--border-color);
+            cursor: not-allowed;
+        }
+        
+        @media (max-width: 768px) {
+            .container {
+                padding: 10px;
+            }
+            
+            .theme-selector {
+                position: static;
+                justify-content: center;
+                margin-top: 10px;
+            }
+            
+            table {
+                font-size: 14px;
+            }
+            
+            th, td {
+                padding: 5px;
+            }
         }
     </style>
 </head>
-<body class="bg-gray-100 min-h-screen">
-    <div class="container mx-auto px-4 py-8">
-        <div class="flex justify-between items-center mb-6">
-            <h1 class="text-2xl font-bold text-gray-800">上传日志（近7天）</h1>
-            <div>
-                <a href="/admin" class="bg-gray-600 hover:bg-gray-700 text-white font-bold py-2 px-4 rounded">
-                    <i class="fas fa-arrow-left mr-2"></i>返回管理面板
-                </a>
-            </div>
+<body>
+    <header>
+        <h1>上传日志</h1>
+        <p>查看图片上传记录</p>
+        <div class="theme-selector">
+            <div class="theme-btn light" title="浅色模式" onclick="setTheme('light')"></div>
+            <div class="theme-btn dark" title="深色模式" onclick="setTheme('dark')"></div>
+            <div class="theme-btn blue" title="蓝色主题" onclick="setTheme('blue')"></div>
+            <div class="theme-btn green" title="绿色主题" onclick="setTheme('green')"></div>
+            <div class="theme-btn purple" title="紫色主题" onclick="setTheme('purple')"></div>
         </div>
-
-        <div class="bg-white shadow-md rounded-lg overflow-hidden">
-            <div class="overflow-x-auto">
-                <table class="min-w-full divide-y divide-gray-200">
-                    <thead class="bg-gray-50">
-                        <tr>
-                            <th scope="col" class="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">文件名</th>
-                            <th scope="col" class="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">原始文件名</th>
-                            <th scope="col" class="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">大小</th>
-                            <th scope="col" class="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">类型</th>
-                            <th scope="col" class="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">IP地址</th>
-                            <th scope="col" class="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">状态</th>
-                            <th scope="col" class="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">上传时间</th>
-                            <th scope="col" class="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">用户</th>
-                        </tr>
-                    </thead>
-                    <tbody class="bg-white divide-y divide-gray-200">
-                        {% for log in logs %}
-                        <tr class="hover:bg-gray-50">
-                            <td class="px-6 py-4 whitespace-nowrap text-sm text-gray-500">
-                                {% if log.filename %}
-                                <a href="/img/{{ log.filename }}" target="_blank" class="text-blue-500 hover:text-blue-700">{{ log.filename }}</a>
-                                {% else %}
-                                <span class="text-gray-400">-</span>
-                                {% endif %}
-                            </td>
-                            <td class="px-6 py-4 whitespace-nowrap text-sm text-gray-500">{{ log.original_filename }}</td>
-                            <td class="px-6 py-4 whitespace-nowrap text-sm text-gray-500">
-                                {% if log.size %}
-                                {{ "%.2f"|format(log.size) }} KB
-                                {% else %}
-                                <span class="text-gray-400">-</span>
-                                {% endif %}
-                            </td>
-                            <td class="px-6 py-4 whitespace-nowrap text-sm text-gray-500">{{ log.mime_type or '-' }}</td>
-                            <td class="px-6 py-4 whitespace-nowrap text-sm text-gray-500">{{ log.ip_address or '-' }}</td>
-                            <td class="px-6 py-4 whitespace-nowrap text-sm">
-                                {% if log.status == 'success' %}
-                                <span class="px-2 inline-flex text-xs leading-5 font-semibold rounded-full bg-green-100 text-green-800">成功</span>
-                                {% elif log.status == 'failed' %}
-                                <span class="px-2 inline-flex text-xs leading-5 font-semibold rounded-full bg-red-100 text-red-800" title="{{ log.error_message }}">失败</span>
-                                {% elif log.status == 'deleted' %}
-                                <span class="px-2 inline-flex text-xs leading-5 font-semibold rounded-full bg-yellow-100 text-yellow-800">已删除</span>
-                                {% else %}
-                                <span class="px-2 inline-flex text-xs leading-5 font-semibold rounded-full bg-gray-100 text-gray-800">{{ log.status }}</span>
-                                {% endif %}
-                            </td>
-                            <td class="px-6 py-4 whitespace-nowrap text-sm text-gray-500">{{ log.upload_time.strftime('%Y-%m-%d %H:%M:%S') }}</td>
-                            <td class="px-6 py-4 whitespace-nowrap text-sm text-gray-500">
-                                {% if log.user %}
-                                {{ log.user.username }}
-                                {% else %}
-                                <span class="text-gray-400">匿名</span>
-                                {% endif %}
-                            </td>
-                        </tr>
-                        {% endfor %}
-                    </tbody>
-                </table>
-            </div>
-        </div>
-
-        <!-- 分页控件 -->
-        <div class="mt-6 flex justify-between items-center">
-            <div class="text-sm text-gray-700">
-                共 <span class="font-medium">{{ total_logs }}</span> 条记录，
-                当前第 <span class="font-medium">{{ page }}</span> 页，
-                共 <span class="font-medium">{{ total_pages }}</span> 页
-            </div>
-            <div class="pagination">
-                {% if page > 1 %}
-                <a href="/logs?page=1" class="bg-white border border-gray-300 text-gray-500 hover:bg-gray-50">
-                    <i class="fas fa-angle-double-left"></i>
-                </a>
-                <a href="/logs?page={{ page - 1 }}" class="bg-white border border-gray-300 text-gray-500 hover:bg-gray-50">
-                    <i class="fas fa-angle-left"></i>
-                </a>
-                {% endif %}
-
-                {% for p in range(max(1, page - 2), min(total_pages + 1, page + 3)) %}
-                <a href="/logs?page={{ p }}" class="bg-white border border-gray-300 text-gray-500 hover:bg-gray-50 {% if p == page %}active{% endif %}">
-                    {{ p }}
-                </a>
+    </header>
+    
+    <div class="container">
+        <div class="card">
+            <a href="/" class="btn">返回主页</a>
+            <a href="/admin/short-links" class="btn">短链管理</a>
+            
+            <table>
+                <thead>
+                    <tr>
+                        <th>时间</th>
+                        <th>原始文件名</th>
+                        <th>文件大小</th>
+                        <th>状态</th>
+                        <th>IP地址</th>
+                    </tr>
+                </thead>
+                <tbody>
+                    {% for log in logs %}
+                    <tr>
+                        <td>{{ log.upload_time.strftime('%Y-%m-%d %H:%M:%S') }}</td>
+                        <td>{{ log.original_filename }}</td>
+                        <td>{% if log.size %}{{ "%.2f"|format(log.size) }} KB{% else %}—{% endif %}</td>
+                        <td class="{% if log.status == 'success' %}success{% elif log.status == 'failed' %}failed{% elif log.status == 'deleted' %}deleted{% endif %}">
+                            {{ log.status }}
+                            {% if log.error_message %}
+                            <span title="{{ log.error_message }}">⚠️</span>
+                            {% endif %}
+                        </td>
+                        <td>{{ log.ip_address }}</td>
+                    </tr>
+                    {% endfor %}
+                </tbody>
+            </table>
+            
+            <!-- 分页 -->
+            {% if total_pages > 1 %}
+            <ul class="pagination">
+                <li class="{% if page == 1 %}disabled{% endif %}">
+                    <a href="?page=1">首页</a>
+                </li>
+                <li class="{% if page == 1 %}disabled{% endif %}">
+                    <a href="?page={{ page - 1 if page > 1 else 1 }}">上一页</a>
+                </li>
+                
+                {% for i in range(max(1, page - 2), min(total_pages + 1, page + 3)) %}
+                <li class="{% if i == page %}active{% endif %}">
+                    <a href="?page={{ i }}">{{ i }}</a>
+                </li>
                 {% endfor %}
-
-                {% if page < total_pages %}
-                <a href="/logs?page={{ page + 1 }}" class="bg-white border border-gray-300 text-gray-500 hover:bg-gray-50">
-                    <i class="fas fa-angle-right"></i>
-                </a>
-                <a href="/logs?page={{ total_pages }}" class="bg-white border border-gray-300 text-gray-500 hover:bg-gray-50">
-                    <i class="fas fa-angle-double-right"></i>
-                </a>
-                {% endif %}
-            </div>
+                
+                <li class="{% if page == total_pages %}disabled{% endif %}">
+                    <a href="?page={{ page + 1 if page < total_pages else total_pages }}">下一页</a>
+                </li>
+                <li class="{% if page == total_pages %}disabled{% endif %}">
+                    <a href="?page={{ total_pages }}">末页</a>
+                </li>
+            </ul>
+            {% endif %}
         </div>
+    </div>
+    
+    <div class="footer">
+        <p>PicUI图床服务 &copy; 2023-2024</p>
     </div>
 
     <script>
-        // 显示错误消息的悬浮提示
-        document.addEventListener('DOMContentLoaded', function() {
-            const failedStatuses = document.querySelectorAll('.bg-red-100');
-            failedStatuses.forEach(function(element) {
-                const errorMessage = element.getAttribute('title');
-                if (errorMessage) {
-                    element.addEventListener('mouseover', function(e) {
-                        const tooltip = document.createElement('div');
-                        tooltip.className = 'bg-black text-white text-xs rounded py-1 px-2 absolute z-10';
-                        tooltip.style.maxWidth = '250px';
-                        tooltip.textContent = errorMessage;
-                        tooltip.style.top = (e.pageY + 10) + 'px';
-                        tooltip.style.left = (e.pageX + 10) + 'px';
-                        tooltip.id = 'error-tooltip';
-                        document.body.appendChild(tooltip);
-                    });
-                    
-                    element.addEventListener('mouseout', function() {
-                        const tooltip = document.getElementById('error-tooltip');
-                        if (tooltip) {
-                            tooltip.remove();
-                        }
-                    });
-                }
-            });
+        // 主题设置
+        function setTheme(theme) {
+            document.documentElement.setAttribute('data-theme', theme);
+            localStorage.setItem('theme', theme);
+        }
+        
+        // 加载保存的主题
+        document.addEventListener('DOMContentLoaded', () => {
+            const savedTheme = localStorage.getItem('theme');
+            if (savedTheme) {
+                document.documentElement.setAttribute('data-theme', savedTheme);
+            } else {
+                // 如果没有保存的主题，默认使用深色主题
+                localStorage.setItem('theme', 'dark');
+            }
         });
     </script>
 </body>

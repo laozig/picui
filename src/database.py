@@ -4,8 +4,6 @@ from sqlalchemy.orm import sessionmaker, relationship
 import datetime
 import os
 import secrets
-import hashlib
-import bcrypt
 import string
 import random
 
@@ -27,52 +25,6 @@ SessionLocal = sessionmaker(autocommit=False, autoflush=False, bind=engine)
 # 创建Base类
 Base = declarative_base()
 
-# 定义用户模型
-class User(Base):
-    __tablename__ = "users"
-
-    id = Column(Integer, primary_key=True, index=True)
-    username = Column(String, unique=True, index=True)
-    email = Column(String, unique=True, index=True)
-    password_hash = Column(String)
-    is_admin = Column(Boolean, default=False)
-    api_token = Column(String, unique=True, index=True)
-    created_at = Column(DateTime, default=datetime.datetime.utcnow)
-    last_login = Column(DateTime, nullable=True)
-    totp_secret = Column(String, nullable=True)
-    totp_enabled = Column(Boolean, default=False)
-    
-    # 关系
-    images = relationship("Image", back_populates="user")
-    
-    def __init__(self, username, email, password, is_admin=False):
-        self.username = username
-        self.email = email
-        self.set_password(password)
-        self.is_admin = is_admin
-        self.generate_api_token()
-        self.totp_enabled = False
-    
-    def set_password(self, password):
-        """设置密码哈希"""
-        password_bytes = password.encode('utf-8')
-        salt = bcrypt.gensalt()
-        self.password_hash = bcrypt.hashpw(password_bytes, salt).decode('utf-8')
-    
-    def check_password(self, password):
-        """验证密码"""
-        password_bytes = password.encode('utf-8')
-        stored_hash = self.password_hash.encode('utf-8')
-        return bcrypt.checkpw(password_bytes, stored_hash)
-    
-    def generate_api_token(self):
-        """生成API令牌"""
-        self.api_token = secrets.token_hex(16)
-        return self.api_token
-    
-    def __repr__(self):
-        return f"<User {self.username}>"
-
 # 定义图片模型
 class Image(Base):
     __tablename__ = "images"
@@ -83,10 +35,6 @@ class Image(Base):
     size = Column(Float)  # 以KB为单位
     mime_type = Column(String)
     upload_time = Column(DateTime, default=datetime.datetime.utcnow)
-    user_id = Column(Integer, ForeignKey("users.id"))
-    
-    # 关系
-    user = relationship("User", back_populates="images")
     
     def __repr__(self):
         return f"<Image {self.filename}>"
@@ -105,10 +53,6 @@ class UploadLog(Base):
     user_agent = Column(String)
     status = Column(String)  # 成功、失败或删除
     error_message = Column(Text, nullable=True)
-    user_id = Column(Integer, ForeignKey("users.id"), nullable=True)
-    
-    # 关系
-    user = relationship("User")
     
     def __repr__(self):
         return f"<UploadLog {self.filename} - {self.status}>"
@@ -123,10 +67,6 @@ class ShortLink(Base):
     created_at = Column(DateTime, default=datetime.datetime.utcnow)
     access_count = Column(BigInteger, default=0)  # 访问计数
     expire_at = Column(DateTime, nullable=True)  # 过期时间，为null则永不过期
-    user_id = Column(Integer, ForeignKey("users.id"), nullable=True)
-    
-    # 关系
-    user = relationship("User")
     
     def is_expired(self):
         """检查链接是否已过期"""
@@ -157,25 +97,4 @@ def get_db():
     try:
         yield db
     finally:
-        db.close()
-
-# 创建管理员账户
-def create_admin_user(db):
-    admin_username = os.getenv("ADMIN_USERNAME", "admin")
-    admin_email = os.getenv("ADMIN_EMAIL", "admin@example.com")
-    admin_password = os.getenv("ADMIN_PASSWORD", "123456")
-    
-    # 检查管理员是否已存在
-    admin = db.query(User).filter(User.username == admin_username).first()
-    if not admin:
-        admin = User(
-            username=admin_username,
-            email=admin_email,
-            password=admin_password,
-            is_admin=True
-        )
-        db.add(admin)
-        db.commit()
-        db.refresh(admin)
-        print(f"管理员账户已创建: {admin_username}")
-    return admin 
+        db.close() 
