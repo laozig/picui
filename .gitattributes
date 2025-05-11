@@ -1,0 +1,36 @@
+# 默认行为：如果没有规则匹配，则使用操作系统默认行为
+* text=auto eol=lf
+
+# 显式声明为文本文件，并统一化行结束符
+*.py text eol=lf
+*.md text eol=lf
+*.yml text eol=lf
+*.yaml text eol=lf
+*.json text eol=lf
+*.html text eol=lf
+*.css text eol=lf
+*.js text eol=lf
+*.sql text eol=lf
+*.sh text eol=lf
+Dockerfile text eol=lf
+.dockerignore text eol=lf
+.gitignore text eol=lf
+.gitattributes text eol=lf
+LICENSE text eol=lf
+requirements.txt text eol=lf
+
+# 声明为二进制文件，不应修改
+*.jpg binary
+*.jpeg binary
+*.png binary
+*.gif binary
+*.webp binary
+*.ico binary
+*.db binary
+*.sqlite3 binary
+
+# 排除生成的文件和目录
+__pycache__/ export-ignore
+*.pyc export-ignore
+*.pyo export-ignore
+*.pyd export-ignore 
