@@ -15,17 +15,32 @@ PORT = int(os.getenv("PORT", 8000))
 HOST = os.getenv("HOST", "0.0.0.0")
 BASE_URL = os.getenv("BASE_URL", f"http://localhost:{PORT}")
 
-app = FastAPI(title="图床服务")
+app = FastAPI(
+    title="PicUI图床服务",
+    description="一个简单高效的图片上传和管理服务",
+    version="1.0.0",
+    docs_url="/docs",
+    redoc_url="/redoc",
+    openapi_url="/openapi.json",
+    openapi_tags=[
+        {"name": "图片", "description": "图片上传、查看和管理操作"},
+        {"name": "系统", "description": "系统相关接口"}
+    ]
+)
 
 # 确保上传目录存在
 UPLOAD_DIR = os.getenv("UPLOAD_DIR", "uploads")
 os.makedirs(UPLOAD_DIR, exist_ok=True)
 
 # 允许的图片格式
-ALLOWED_EXTENSIONS = {"jpg", "jpeg", "png", "gif", "webp"}
+ALLOWED_EXTENSIONS = {
+    "jpg", "jpeg", "png", "gif", "webp", 
+    "bmp", "tiff", "tif", "svg", "ico", 
+    "heic", "heif", "avif", "jfif", "pjpeg", "pjp"
+}
 
-# 文件大小限制 (5MB)
-MAX_SIZE = int(os.getenv("MAX_FILE_SIZE", 5 * 1024 * 1024))  # 默认5MB
+# 文件大小限制 (默认20MB)
+MAX_SIZE = int(os.getenv("MAX_FILE_SIZE", 20 * 1024 * 1024))  # 默认20MB
 
 # 在应用启动时创建数据库表
 @app.on_event("startup")
@@ -36,13 +51,15 @@ def startup_event():
 def allowed_file(filename):
     return '.' in filename and filename.rsplit('.', 1)[1].lower() in ALLOWED_EXTENSIONS
 
-@app.post("/upload")
-async def upload_image(file: UploadFile = File(...), db: Session = Depends(get_db), request: Request = None):
+@app.post("/upload", tags=["图片"], summary="上传图片", description="上传图片文件并返回访问URL")
+async def upload_image(file: UploadFile = File(..., description="要上传的图片文件"), 
+                      db: Session = Depends(get_db), 
+                      request: Request = None):
     # 检查文件类型
     if not allowed_file(file.filename):
         raise HTTPException(
             status_code=400,
-            detail="只允许上传 jpg, jpeg, png, gif, webp 格式的图片"
+            detail=f"只允许上传以下格式的图片: {', '.join(sorted(ALLOWED_EXTENSIONS))}"
         )
     
     # 读取文件内容
@@ -59,7 +76,7 @@ async def upload_image(file: UploadFile = File(...), db: Session = Depends(get_d
     await file.seek(0)
     
     # 生成唯一文件名
-    file_extension = file.filename.split('.')[-1]
+    file_extension = file.filename.split('.')[-1].lower()
     unique_filename = f"{uuid.uuid4()}.{file_extension}"
     file_location = os.path.join(UPLOAD_DIR, unique_filename)
     
@@ -99,25 +116,30 @@ async def upload_image(file: UploadFile = File(...), db: Session = Depends(get_d
     
     return {"url": file_url, "filename": unique_filename, "id": db_image.id}
 
-@app.get("/images/{filename}")
+@app.get("/images/{filename}", tags=["图片"], summary="获取图片", description="通过文件名获取图片")
 async def get_image(filename: str):
     file_path = os.path.join(UPLOAD_DIR, filename)
     if not os.path.exists(file_path):
         raise HTTPException(status_code=404, detail="图片不存在")
     return FileResponse(file_path)
 
-@app.get("/images")
+@app.get("/images", tags=["图片"], summary="获取图片列表", description="获取所有上传的图片列表")
 def list_images(db: Session = Depends(get_db), skip: int = 0, limit: int = 100):
     images = db.query(Image).offset(skip).limit(limit).all()
     return images
 
+# 获取支持的图片格式
+@app.get("/supported-formats", tags=["系统"], summary="获取支持的图片格式", description="获取系统支持的图片格式和大小限制")
+def get_supported_formats():
+    return {"formats": sorted(list(ALLOWED_EXTENSIONS)), "max_size_mb": MAX_SIZE/1024/1024}
+
 # 根路径重定向到前端页面
-@app.get("/")
+@app.get("/", tags=["系统"], summary="主页", description="访问图床服务主页")
 async def root():
     return FileResponse("static/index.html")
 
 # 添加健康检查端点
-@app.get("/health")
+@app.get("/health", tags=["系统"], summary="健康检查", description="检查服务是否正常运行")
 async def health_check():
     return {"status": "healthy"}
 

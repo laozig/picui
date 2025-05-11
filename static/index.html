@@ -3,97 +3,301 @@
 <head>
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
-    <title>图床上传服务</title>
+    <title>PicUI - 简洁高效的图床服务</title>
+    <link rel="icon" href="data:image/svg+xml,<svg xmlns=%22http://www.w3.org/2000/svg%22 viewBox=%220 0 100 100%22><text y=%22.9em%22 font-size=%2290%22>🖼️</text></svg>">
     <!-- 引入TailwindCSS -->
     <script src="https://cdn.tailwindcss.com"></script>
     <style>
+        @import url('https://fonts.googleapis.com/css2?family=Nunito:wght@400;500;600;700&display=swap');
+        
+        body {
+            font-family: 'Nunito', system-ui, sans-serif;
+            background-color: #f9fafb;
+            background-image: 
+                radial-gradient(circle at 25px 25px, #e5e7eb 2px, transparent 0),
+                radial-gradient(circle at 75px 75px, #e5e7eb 2px, transparent 0);
+            background-size: 100px 100px;
+        }
+        
+        .container {
+            max-width: 900px;
+            box-shadow: 0 10px 30px rgba(0, 0, 0, 0.08);
+            border: 1px solid rgba(0, 0, 0, 0.05);
+            backdrop-filter: blur(10px);
+            background-color: rgba(255, 255, 255, 0.95);
+        }
+        
         .drag-active {
             border-color: #3b82f6;
-            background-color: #eff6ff;
+            background-color: rgba(239, 246, 255, 0.8);
+            transform: scale(1.02);
         }
+        
         .image-preview {
             max-height: 300px;
             max-width: 100%;
+            box-shadow: 0 4px 12px rgba(0, 0, 0, 0.1);
+            border-radius: 8px;
+            transition: all 0.3s ease;
+        }
+        
+        .image-preview:hover {
+            transform: scale(1.02);
+            box-shadow: 0 8px 20px rgba(0, 0, 0, 0.15);
+        }
+        
+        .format-badge {
+            display: inline-block;
+            background-color: #f3f4f6;
+            color: #4b5563;
+            padding: 2px 8px;
+            border-radius: 6px;
+            margin: 3px;
+            font-size: 0.75rem;
+            transition: all 0.2s ease;
+            border: 1px solid #e5e7eb;
+        }
+        
+        .format-badge:hover {
+            background-color: #3b82f6;
+            color: white;
+            transform: translateY(-2px);
+            border-color: #3b82f6;
+        }
+        
+        .btn {
+            transition: all 0.3s ease;
+            position: relative;
+            overflow: hidden;
+        }
+        
+        .btn:hover {
+            transform: translateY(-2px);
+            box-shadow: 0 4px 12px rgba(0, 0, 0, 0.1);
+        }
+        
+        .btn:active {
+            transform: translateY(0);
+        }
+        
+        .btn::after {
+            content: '';
+            position: absolute;
+            top: 50%;
+            left: 50%;
+            width: 5px;
+            height: 5px;
+            background: rgba(255, 255, 255, 0.5);
+            opacity: 0;
+            border-radius: 100%;
+            transform: scale(1, 1) translate(-50%);
+            transform-origin: 50% 50%;
+        }
+
+        .btn:focus:not(:active)::after {
+            animation: ripple 1s ease-out;
+        }
+
+        @keyframes ripple {
+            0% {
+                transform: scale(0, 0);
+                opacity: 0.5;
+            }
+            100% {
+                transform: scale(20, 20);
+                opacity: 0;
+            }
+        }
+        
+        .input-group {
+            transition: all 0.3s ease;
+        }
+        
+        .input-group:hover {
+            transform: translateY(-2px);
+        }
+        
+        @keyframes pulse {
+            0% { transform: scale(1); }
+            50% { transform: scale(1.05); }
+            100% { transform: scale(1); }
+        }
+        
+        .pulse-animation {
+            animation: pulse 1.5s infinite;
+        }
+        
+        .drop-area-container {
+            border: 2px dashed #e5e7eb;
+            border-radius: 16px;
+            transition: all 0.3s ease;
+        }
+        
+        .drop-area-container:hover {
+            border-color: #93c5fd;
+            background-color: #f0f9ff;
+        }
+        
+        .card {
+            transition: all 0.3s ease;
+        }
+        
+        .card:hover {
+            transform: translateY(-4px);
+            box-shadow: 0 12px 30px rgba(0, 0, 0, 0.12);
+        }
+        
+        .copy-btn:focus {
+            outline: none;
+            box-shadow: 0 0 0 3px rgba(59, 130, 246, 0.5);
+        }
+        
+        .logo-text {
+            background: linear-gradient(135deg, #3b82f6 0%, #2563eb 100%);
+            -webkit-background-clip: text;
+            -webkit-text-fill-color: transparent;
         }
     </style>
 </head>
-<body class="bg-gray-50 min-h-screen flex items-center justify-center">
-    <div class="container max-w-3xl mx-auto p-6 bg-white rounded-xl shadow-md">
-        <h1 class="text-2xl font-bold text-center mb-8 text-gray-800">图床上传服务</h1>
-        
-        <!-- 文件上传区域 -->
-        <div id="drop-area" class="border-2 border-dashed border-gray-300 rounded-lg p-8 mb-6 text-center transition-all cursor-pointer hover:bg-gray-50">
-            <div class="mb-4">
-                <svg xmlns="http://www.w3.org/2000/svg" class="h-12 w-12 mx-auto text-gray-400" fill="none" viewBox="0 0 24 24" stroke="currentColor">
-                    <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M7 16a4 4 0 01-.88-7.903A5 5 0 1115.9 6L16 6a5 5 0 011 9.9M15 13l-3-3m0 0l-3 3m3-3v12" />
+<body class="min-h-screen flex items-center justify-center py-10">
+    <div class="container mx-auto p-8 rounded-3xl">
+        <div class="flex items-center justify-center mb-6">
+            <div class="bg-blue-500 text-white p-3 rounded-xl mr-3 shadow-lg">
+                <svg xmlns="http://www.w3.org/2000/svg" class="h-8 w-8" fill="none" viewBox="0 0 24 24" stroke="currentColor">
+                    <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M4 16l4.586-4.586a2 2 0 012.828 0L16 16m-2-2l1.586-1.586a2 2 0 012.828 0L20 14m-6-6h.01M6 20h12a2 2 0 002-2V6a2 2 0 00-2-2H6a2 2 0 00-2 2v12a2 2 0 002 2z" />
                 </svg>
             </div>
-            <p class="text-gray-700 mb-2">拖拽图片到这里或</p>
-            <label class="inline-block bg-blue-500 text-white px-4 py-2 rounded-md cursor-pointer hover:bg-blue-600 transition-colors">
-                选择图片
-                <input id="file-input" type="file" accept="image/jpeg,image/png,image/gif,image/webp" class="hidden" />
-            </label>
-            <p class="text-sm text-gray-500 mt-3">支持: JPG, JPEG, PNG, GIF, WEBP (最大 5MB)</p>
+            <h1 class="text-3xl font-bold">
+                <span class="logo-text">PicUI</span>
+                <span class="text-gray-700">图床</span>
+            </h1>
+        </div>
+        
+        <div class="mb-6 text-center">
+            <p class="text-gray-500">简单高效的图片上传与分享服务</p>
+        </div>
+        
+        <!-- 文件上传区域 -->
+        <div class="drop-area-container p-2 mb-8">
+            <div id="drop-area" class="bg-white rounded-xl p-8 text-center transition-all cursor-pointer hover:bg-blue-50">
+                <div class="mb-6">
+                    <svg xmlns="http://www.w3.org/2000/svg" class="h-16 w-16 mx-auto text-blue-400" fill="none" viewBox="0 0 24 24" stroke="currentColor">
+                        <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M7 16a4 4 0 01-.88-7.903A5 5 0 1115.9 6L16 6a5 5 0 011 9.9M15 13l-3-3m0 0l-3 3m3-3v12" />
+                    </svg>
+                </div>
+                <p class="text-gray-700 text-lg mb-4">拖拽图片到这里或</p>
+                <label class="inline-block bg-blue-500 text-white px-6 py-3 rounded-lg cursor-pointer hover:bg-blue-600 transition-colors btn shadow-md">
+                    选择图片
+                    <input id="file-input" type="file" accept="image/*" class="hidden" />
+                </label>
+                <div class="text-sm text-gray-500 mt-5">
+                    <p class="text-base">支持多种图片格式 (最大 <span id="max-size" class="font-semibold text-blue-600">20MB</span>)</p>
+                    <div id="format-list" class="mt-3 flex flex-wrap justify-center">
+                        <span class="format-badge pulse-animation">加载中...</span>
+                    </div>
+                </div>
+            </div>
         </div>
         
         <!-- 上传按钮 -->
-        <div class="text-center mb-6">
-            <button id="upload-button" class="bg-green-500 text-white px-6 py-2 rounded-md hover:bg-green-600 transition-colors" disabled>
+        <div class="text-center mb-8">
+            <button id="upload-button" class="bg-gradient-to-r from-green-500 to-emerald-600 text-white px-10 py-3 rounded-lg transition-colors btn font-semibold text-lg disabled:opacity-50 disabled:cursor-not-allowed shadow-md" disabled>
                 上传图片
             </button>
         </div>
         
         <!-- 上传结果区域 -->
         <div id="result-area" class="hidden">
-            <div class="border rounded-lg overflow-hidden">
-                <div class="bg-gray-100 p-4 border-b">
-                    <h2 class="font-semibold text-gray-700">上传成功</h2>
+            <div class="border rounded-xl overflow-hidden shadow-lg card bg-white">
+                <div class="bg-gradient-to-r from-blue-500 to-blue-600 p-4">
+                    <h2 class="font-semibold text-white text-lg flex items-center">
+                        <svg xmlns="http://www.w3.org/2000/svg" class="h-5 w-5 mr-2" fill="none" viewBox="0 0 24 24" stroke="currentColor">
+                            <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M9 12l2 2 4-4m6 2a9 9 0 11-18 0 9 9 0 0118 0z" />
+                        </svg>
+                        上传成功
+                    </h2>
                 </div>
-                <div class="p-4">
+                <div class="p-6">
                     <!-- 图片预览 -->
-                    <div class="mb-4 text-center">
-                        <img id="image-preview" class="image-preview mx-auto rounded" src="" alt="预览图">
+                    <div class="mb-6 text-center">
+                        <img id="image-preview" class="image-preview mx-auto" src="" alt="预览图">
                     </div>
                     
                     <!-- 图片链接 -->
-                    <div class="mb-2">
-                        <label class="block text-sm font-medium text-gray-700 mb-1">图片链接</label>
+                    <div class="mb-4 input-group">
+                        <label class="block text-sm font-medium text-gray-700 mb-2 flex items-center">
+                            <svg xmlns="http://www.w3.org/2000/svg" class="h-4 w-4 mr-1" fill="none" viewBox="0 0 24 24" stroke="currentColor">
+                                <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M13.828 10.172a4 4 0 00-5.656 0l-4 4a4 4 0 105.656 5.656l1.102-1.101m-.758-4.899a4 4 0 005.656 0l4-4a4 4 0 00-5.656-5.656l-1.1 1.1" />
+                            </svg>
+                            图片链接
+                        </label>
                         <div class="flex">
-                            <input id="image-url" type="text" readonly class="flex-grow p-2 border rounded-l-md focus:outline-none focus:ring-2 focus:ring-blue-500" />
-                            <button id="copy-url" class="bg-blue-500 text-white px-3 py-2 rounded-r-md hover:bg-blue-600 focus:outline-none">
+                            <input id="image-url" type="text" readonly class="flex-grow p-3 border rounded-l-lg focus:outline-none focus:ring-2 focus:ring-blue-500 bg-gray-50" />
+                            <button id="copy-url" class="bg-blue-500 text-white px-4 py-3 rounded-r-lg hover:bg-blue-600 focus:outline-none btn copy-btn">
                                 复制
                             </button>
                         </div>
                     </div>
                     
                     <!-- HTML代码 -->
-                    <div class="mb-2">
-                        <label class="block text-sm font-medium text-gray-700 mb-1">HTML代码</label>
+                    <div class="mb-4 input-group">
+                        <label class="block text-sm font-medium text-gray-700 mb-2 flex items-center">
+                            <svg xmlns="http://www.w3.org/2000/svg" class="h-4 w-4 mr-1" fill="none" viewBox="0 0 24 24" stroke="currentColor">
+                                <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M10 20l4-16m4 4l4 4-4 4M6 16l-4-4 4-4" />
+                            </svg>
+                            HTML代码
+                        </label>
                         <div class="flex">
-                            <input id="html-code" type="text" readonly class="flex-grow p-2 border rounded-l-md focus:outline-none focus:ring-2 focus:ring-blue-500" />
-                            <button id="copy-html" class="bg-blue-500 text-white px-3 py-2 rounded-r-md hover:bg-blue-600 focus:outline-none">
+                            <input id="html-code" type="text" readonly class="flex-grow p-3 border rounded-l-lg focus:outline-none focus:ring-2 focus:ring-blue-500 bg-gray-50" />
+                            <button id="copy-html" class="bg-blue-500 text-white px-4 py-3 rounded-r-lg hover:bg-blue-600 focus:outline-none btn copy-btn">
                                 复制
                             </button>
                         </div>
                     </div>
                     
                     <!-- Markdown代码 -->
-                    <div>
-                        <label class="block text-sm font-medium text-gray-700 mb-1">Markdown代码</label>
+                    <div class="input-group">
+                        <label class="block text-sm font-medium text-gray-700 mb-2 flex items-center">
+                            <svg xmlns="http://www.w3.org/2000/svg" class="h-4 w-4 mr-1" fill="none" viewBox="0 0 24 24" stroke="currentColor">
+                                <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M7 8h10M7 12h4m1 8l-4-4H5a2 2 0 01-2-2V6a2 2 0 012-2h14a2 2 0 012 2v8a2 2 0 01-2 2h-3l-4 4z" />
+                            </svg>
+                            Markdown代码
+                        </label>
                         <div class="flex">
-                            <input id="md-code" type="text" readonly class="flex-grow p-2 border rounded-l-md focus:outline-none focus:ring-2 focus:ring-blue-500" />
-                            <button id="copy-md" class="bg-blue-500 text-white px-3 py-2 rounded-r-md hover:bg-blue-600 focus:outline-none">
+                            <input id="md-code" type="text" readonly class="flex-grow p-3 border rounded-l-lg focus:outline-none focus:ring-2 focus:ring-blue-500 bg-gray-50" />
+                            <button id="copy-md" class="bg-blue-500 text-white px-4 py-3 rounded-r-lg hover:bg-blue-600 focus:outline-none btn copy-btn">
                                 复制
                             </button>
                         </div>
+                    </div>
+                    
+                    <!-- 快捷操作按钮 -->
+                    <div class="mt-6 flex justify-center space-x-4">
+                        <button id="upload-another" class="bg-gray-100 hover:bg-gray-200 text-gray-700 px-4 py-2 rounded-lg transition-colors btn flex items-center">
+                            <svg xmlns="http://www.w3.org/2000/svg" class="h-4 w-4 mr-1" fill="none" viewBox="0 0 24 24" stroke="currentColor">
+                                <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M4 16v1a3 3 0 003 3h10a3 3 0 003-3v-1m-4-8l-4-4m0 0l-4 4m4-4v12" />
+                            </svg>
+                            上传另一张
+                        </button>
+                        <a id="open-image" href="#" target="_blank" class="bg-gray-100 hover:bg-gray-200 text-gray-700 px-4 py-2 rounded-lg transition-colors btn flex items-center">
+                            <svg xmlns="http://www.w3.org/2000/svg" class="h-4 w-4 mr-1" fill="none" viewBox="0 0 24 24" stroke="currentColor">
+                                <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M10 6H6a2 2 0 00-2 2v10a2 2 0 002 2h10a2 2 0 002-2v-4M14 4h6m0 0v6m0-6L10 14" />
+                            </svg>
+                            在新窗口打开
+                        </a>
                     </div>
                 </div>
             </div>
         </div>
         
         <!-- 状态提示 -->
-        <div id="status-message" class="mt-4 text-center hidden">
-            <p id="status-text" class="text-sm font-medium"></p>
+        <div id="status-message" class="mt-6 text-center hidden">
+            <p id="status-text" class="text-base font-medium"></p>
+        </div>
+        
+        <!-- 页脚 -->
+        <div class="mt-10 text-center text-sm text-gray-500">
+            <p>PicUI 图床服务 &copy; 2023 | <a href="/docs" class="text-blue-500 hover:underline">API文档</a></p>
         </div>
     </div>
 
@@ -113,9 +317,43 @@
             const copyUrlBtn = document.getElementById('copy-url');
             const copyHtmlBtn = document.getElementById('copy-html');
             const copyMdBtn = document.getElementById('copy-md');
+            const formatList = document.getElementById('format-list');
+            const maxSizeSpan = document.getElementById('max-size');
+            const uploadAnother = document.getElementById('upload-another');
+            const openImage = document.getElementById('open-image');
             
             // 当前选择的文件
             let selectedFile = null;
+            
+            // 支持的格式和最大文件大小
+            let supportedFormats = [];
+            let maxFileSizeMB = 20;
+            
+            // 获取支持的格式
+            fetch('/supported-formats')
+                .then(response => response.json())
+                .then(data => {
+                    supportedFormats = data.formats;
+                    maxFileSizeMB = data.max_size_mb;
+                    
+                    // 更新UI
+                    maxSizeSpan.textContent = `${maxFileSizeMB}MB`;
+                    
+                    // 清空格式列表
+                    formatList.innerHTML = '';
+                    
+                    // 添加格式徽章
+                    supportedFormats.forEach(format => {
+                        const badge = document.createElement('span');
+                        badge.className = 'format-badge';
+                        badge.textContent = format.toUpperCase();
+                        formatList.appendChild(badge);
+                    });
+                })
+                .catch(error => {
+                    console.error('获取支持格式失败:', error);
+                    formatList.innerHTML = '<span class="format-badge">JPG</span><span class="format-badge">PNG</span><span class="format-badge">GIF</span><span class="format-badge">WEBP</span><span class="format-badge">更多...</span>';
+                });
             
             // 监听拖拽事件
             ['dragenter', 'dragover', 'dragleave', 'drop'].forEach(eventName => {
@@ -163,16 +401,23 @@
             
             // 处理选择或拖拽的文件
             function handleFile(file) {
-                // 检查文件类型
-                const validTypes = ['image/jpeg', 'image/png', 'image/gif', 'image/webp'];
-                if (!validTypes.includes(file.type)) {
-                    showStatus('错误: 只能上传JPG、PNG、GIF或WEBP格式图片', 'error');
+                // 检查文件是否为图片
+                if (!file.type.startsWith('image/')) {
+                    showStatus('错误: 请选择图片文件', 'error');
                     return;
                 }
                 
-                // 检查文件大小 (5MB)
-                if (file.size > 5 * 1024 * 1024) {
-                    showStatus('错误: 文件大小不能超过5MB', 'error');
+                // 检查文件扩展名是否支持
+                const extension = file.name.split('.').pop().toLowerCase();
+                if (supportedFormats.length > 0 && !supportedFormats.includes(extension)) {
+                    showStatus(`错误: 不支持的图片格式 ${extension}`, 'error');
+                    return;
+                }
+                
+                // 检查文件大小
+                const maxSizeBytes = maxFileSizeMB * 1024 * 1024;
+                if (file.size > maxSizeBytes) {
+                    showStatus(`错误: 文件大小不能超过${maxFileSizeMB}MB`, 'error');
                     return;
                 }
                 
@@ -181,8 +426,7 @@
                 
                 // 启用上传按钮
                 uploadButton.removeAttribute('disabled');
-                uploadButton.classList.remove('bg-green-500', 'hover:bg-green-600');
-                uploadButton.classList.add('bg-green-600', 'hover:bg-green-700');
+                uploadButton.classList.add('pulse-animation');
                 
                 // 显示文件名
                 showStatus(`已选择: ${file.name}`, 'info');
@@ -190,6 +434,21 @@
             
             // 上传按钮点击事件
             uploadButton.addEventListener('click', uploadFile);
+            
+            // 上传另一张按钮点击事件
+            uploadAnother.addEventListener('click', function() {
+                // 隐藏结果区域
+                resultArea.classList.add('hidden');
+                // 清空状态
+                selectedFile = null;
+                // 禁用上传按钮
+                uploadButton.setAttribute('disabled', 'true');
+                uploadButton.classList.remove('pulse-animation');
+                // 清空文件输入
+                fileInput.value = '';
+                // 隐藏状态消息
+                statusMessage.classList.add('hidden');
+            });
             
             function uploadFile() {
                 if (!selectedFile) return;
@@ -201,6 +460,7 @@
                 // 显示上传中状态
                 uploadButton.textContent = '上传中...';
                 uploadButton.setAttribute('disabled', 'true');
+                uploadButton.classList.remove('pulse-animation');
                 showStatus('上传中...', 'info');
                 
                 // 发送上传请求
@@ -210,7 +470,9 @@
                 })
                 .then(response => {
                     if (!response.ok) {
-                        throw new Error(`HTTP错误: ${response.status}`);
+                        return response.json().then(err => {
+                            throw new Error(err.detail || `HTTP错误: ${response.status}`);
+                        });
                     }
                     return response.json();
                 })
@@ -232,6 +494,12 @@
                     imageUrl.value = data.url;
                     htmlCode.value = `<img src="${data.url}" alt="image">`;
                     mdCode.value = `![image](${data.url})`;
+                    
+                    // 设置打开链接
+                    openImage.href = data.url;
+                    
+                    // 滚动到结果区域
+                    resultArea.scrollIntoView({behavior: 'smooth'});
                 })
                 .catch(error => {
                     console.error('上传错误:', error);
@@ -271,7 +539,7 @@
                 statusText.textContent = message;
                 
                 // 根据消息类型设置颜色
-                statusText.className = 'text-sm font-medium';
+                statusText.className = 'text-base font-medium';
                 if (type === 'error') {
                     statusText.classList.add('text-red-500');
                 } else if (type === 'success') {
