@@ -1,0 +1,15 @@
+services:
+  - type: web
+    name: picui-image-hosting
+    runtime: docker
+    repo: https://github.com/yourusername/picui.git
+    branch: main
+    buildCommand: docker build -t picui .
+    startCommand: docker run -p $PORT:8000 -v /data/uploads:/app/uploads picui
+    envVars:
+      - key: PORT
+        value: 8000
+    disk:
+      name: uploads
+      mountPath: /data/uploads
+      sizeGB: 1 

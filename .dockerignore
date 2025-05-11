@@ -1,0 +1,35 @@
+# 版本控制
+.git
+.gitignore
+
+# 虚拟环境
+venv/
+venv_picui/
+.venv/
+env/
+ENV/
+
+# 缓存文件
+__pycache__/
+*.py[cod]
+*$py.class
+*.so
+.Python
+.pytest_cache/
+.coverage
+htmlcov/
+
+# 项目文件
+*.db
+uploads/*
+!uploads/.gitkeep
+
+# 系统文件
+.DS_Store
+Thumbs.db
+
+# 编辑器
+.idea/
+.vscode/
+*.swp
+*.swo 

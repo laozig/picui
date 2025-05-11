@@ -1,0 +1,286 @@
+<!DOCTYPE html>
+<html lang="zh-CN">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>图床上传服务</title>
+    <!-- 引入TailwindCSS -->
+    <script src="https://cdn.tailwindcss.com"></script>
+    <style>
+        .drag-active {
+            border-color: #3b82f6;
+            background-color: #eff6ff;
+        }
+        .image-preview {
+            max-height: 300px;
+            max-width: 100%;
+        }
+    </style>
+</head>
+<body class="bg-gray-50 min-h-screen flex items-center justify-center">
+    <div class="container max-w-3xl mx-auto p-6 bg-white rounded-xl shadow-md">
+        <h1 class="text-2xl font-bold text-center mb-8 text-gray-800">图床上传服务</h1>
+        
+        <!-- 文件上传区域 -->
+        <div id="drop-area" class="border-2 border-dashed border-gray-300 rounded-lg p-8 mb-6 text-center transition-all cursor-pointer hover:bg-gray-50">
+            <div class="mb-4">
+                <svg xmlns="http://www.w3.org/2000/svg" class="h-12 w-12 mx-auto text-gray-400" fill="none" viewBox="0 0 24 24" stroke="currentColor">
+                    <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M7 16a4 4 0 01-.88-7.903A5 5 0 1115.9 6L16 6a5 5 0 011 9.9M15 13l-3-3m0 0l-3 3m3-3v12" />
+                </svg>
+            </div>
+            <p class="text-gray-700 mb-2">拖拽图片到这里或</p>
+            <label class="inline-block bg-blue-500 text-white px-4 py-2 rounded-md cursor-pointer hover:bg-blue-600 transition-colors">
+                选择图片
+                <input id="file-input" type="file" accept="image/jpeg,image/png,image/gif,image/webp" class="hidden" />
+            </label>
+            <p class="text-sm text-gray-500 mt-3">支持: JPG, JPEG, PNG, GIF, WEBP (最大 5MB)</p>
+        </div>
+        
+        <!-- 上传按钮 -->
+        <div class="text-center mb-6">
+            <button id="upload-button" class="bg-green-500 text-white px-6 py-2 rounded-md hover:bg-green-600 transition-colors" disabled>
+                上传图片
+            </button>
+        </div>
+        
+        <!-- 上传结果区域 -->
+        <div id="result-area" class="hidden">
+            <div class="border rounded-lg overflow-hidden">
+                <div class="bg-gray-100 p-4 border-b">
+                    <h2 class="font-semibold text-gray-700">上传成功</h2>
+                </div>
+                <div class="p-4">
+                    <!-- 图片预览 -->
+                    <div class="mb-4 text-center">
+                        <img id="image-preview" class="image-preview mx-auto rounded" src="" alt="预览图">
+                    </div>
+                    
+                    <!-- 图片链接 -->
+                    <div class="mb-2">
+                        <label class="block text-sm font-medium text-gray-700 mb-1">图片链接</label>
+                        <div class="flex">
+                            <input id="image-url" type="text" readonly class="flex-grow p-2 border rounded-l-md focus:outline-none focus:ring-2 focus:ring-blue-500" />
+                            <button id="copy-url" class="bg-blue-500 text-white px-3 py-2 rounded-r-md hover:bg-blue-600 focus:outline-none">
+                                复制
+                            </button>
+                        </div>
+                    </div>
+                    
+                    <!-- HTML代码 -->
+                    <div class="mb-2">
+                        <label class="block text-sm font-medium text-gray-700 mb-1">HTML代码</label>
+                        <div class="flex">
+                            <input id="html-code" type="text" readonly class="flex-grow p-2 border rounded-l-md focus:outline-none focus:ring-2 focus:ring-blue-500" />
+                            <button id="copy-html" class="bg-blue-500 text-white px-3 py-2 rounded-r-md hover:bg-blue-600 focus:outline-none">
+                                复制
+                            </button>
+                        </div>
+                    </div>
+                    
+                    <!-- Markdown代码 -->
+                    <div>
+                        <label class="block text-sm font-medium text-gray-700 mb-1">Markdown代码</label>
+                        <div class="flex">
+                            <input id="md-code" type="text" readonly class="flex-grow p-2 border rounded-l-md focus:outline-none focus:ring-2 focus:ring-blue-500" />
+                            <button id="copy-md" class="bg-blue-500 text-white px-3 py-2 rounded-r-md hover:bg-blue-600 focus:outline-none">
+                                复制
+                            </button>
+                        </div>
+                    </div>
+                </div>
+            </div>
+        </div>
+        
+        <!-- 状态提示 -->
+        <div id="status-message" class="mt-4 text-center hidden">
+            <p id="status-text" class="text-sm font-medium"></p>
+        </div>
+    </div>
+
+    <script>
+        document.addEventListener('DOMContentLoaded', function() {
+            // 获取DOM元素
+            const dropArea = document.getElementById('drop-area');
+            const fileInput = document.getElementById('file-input');
+            const uploadButton = document.getElementById('upload-button');
+            const resultArea = document.getElementById('result-area');
+            const imagePreview = document.getElementById('image-preview');
+            const imageUrl = document.getElementById('image-url');
+            const htmlCode = document.getElementById('html-code');
+            const mdCode = document.getElementById('md-code');
+            const statusMessage = document.getElementById('status-message');
+            const statusText = document.getElementById('status-text');
+            const copyUrlBtn = document.getElementById('copy-url');
+            const copyHtmlBtn = document.getElementById('copy-html');
+            const copyMdBtn = document.getElementById('copy-md');
+            
+            // 当前选择的文件
+            let selectedFile = null;
+            
+            // 监听拖拽事件
+            ['dragenter', 'dragover', 'dragleave', 'drop'].forEach(eventName => {
+                dropArea.addEventListener(eventName, preventDefaults, false);
+            });
+            
+            function preventDefaults(e) {
+                e.preventDefault();
+                e.stopPropagation();
+            }
+            
+            // 拖拽进入和拖拽经过效果
+            ['dragenter', 'dragover'].forEach(eventName => {
+                dropArea.addEventListener(eventName, highlight, false);
+            });
+            
+            // 拖拽离开和放置效果
+            ['dragleave', 'drop'].forEach(eventName => {
+                dropArea.addEventListener(eventName, unhighlight, false);
+            });
+            
+            function highlight() {
+                dropArea.classList.add('drag-active');
+            }
+            
+            function unhighlight() {
+                dropArea.classList.remove('drag-active');
+            }
+            
+            // 处理拖放文件
+            dropArea.addEventListener('drop', handleDrop, false);
+            
+            function handleDrop(e) {
+                const dt = e.dataTransfer;
+                const file = dt.files[0];
+                handleFile(file);
+            }
+            
+            // 处理文件选择
+            fileInput.addEventListener('change', function() {
+                if (this.files && this.files[0]) {
+                    handleFile(this.files[0]);
+                }
+            });
+            
+            // 处理选择或拖拽的文件
+            function handleFile(file) {
+                // 检查文件类型
+                const validTypes = ['image/jpeg', 'image/png', 'image/gif', 'image/webp'];
+                if (!validTypes.includes(file.type)) {
+                    showStatus('错误: 只能上传JPG、PNG、GIF或WEBP格式图片', 'error');
+                    return;
+                }
+                
+                // 检查文件大小 (5MB)
+                if (file.size > 5 * 1024 * 1024) {
+                    showStatus('错误: 文件大小不能超过5MB', 'error');
+                    return;
+                }
+                
+                // 保存文件引用
+                selectedFile = file;
+                
+                // 启用上传按钮
+                uploadButton.removeAttribute('disabled');
+                uploadButton.classList.remove('bg-green-500', 'hover:bg-green-600');
+                uploadButton.classList.add('bg-green-600', 'hover:bg-green-700');
+                
+                // 显示文件名
+                showStatus(`已选择: ${file.name}`, 'info');
+            }
+            
+            // 上传按钮点击事件
+            uploadButton.addEventListener('click', uploadFile);
+            
+            function uploadFile() {
+                if (!selectedFile) return;
+                
+                // 创建FormData
+                const formData = new FormData();
+                formData.append('file', selectedFile);
+                
+                // 显示上传中状态
+                uploadButton.textContent = '上传中...';
+                uploadButton.setAttribute('disabled', 'true');
+                showStatus('上传中...', 'info');
+                
+                // 发送上传请求
+                fetch('/upload', {
+                    method: 'POST',
+                    body: formData
+                })
+                .then(response => {
+                    if (!response.ok) {
+                        throw new Error(`HTTP错误: ${response.status}`);
+                    }
+                    return response.json();
+                })
+                .then(data => {
+                    // 显示成功状态
+                    showStatus('上传成功!', 'success');
+                    
+                    // 重置上传按钮
+                    uploadButton.textContent = '上传图片';
+                    uploadButton.removeAttribute('disabled');
+                    
+                    // 显示结果区域
+                    resultArea.classList.remove('hidden');
+                    
+                    // 设置图片预览
+                    imagePreview.src = data.url;
+                    
+                    // 设置各种代码格式
+                    imageUrl.value = data.url;
+                    htmlCode.value = `<img src="${data.url}" alt="image">`;
+                    mdCode.value = `![image](${data.url})`;
+                })
+                .catch(error => {
+                    console.error('上传错误:', error);
+                    showStatus(`上传失败: ${error.message}`, 'error');
+                    
+                    // 重置上传按钮
+                    uploadButton.textContent = '上传图片';
+                    uploadButton.removeAttribute('disabled');
+                });
+            }
+            
+            // 复制功能
+            [copyUrlBtn, copyHtmlBtn, copyMdBtn].forEach(btn => {
+                btn.addEventListener('click', function() {
+                    const input = this.previousElementSibling;
+                    input.select();
+                    document.execCommand('copy');
+                    
+                    // 显示复制成功提示
+                    const originalText = this.textContent;
+                    this.textContent = '已复制!';
+                    this.classList.remove('bg-blue-500', 'hover:bg-blue-600');
+                    this.classList.add('bg-green-500', 'hover:bg-green-600');
+                    
+                    // 恢复按钮原始状态
+                    setTimeout(() => {
+                        this.textContent = originalText;
+                        this.classList.remove('bg-green-500', 'hover:bg-green-600');
+                        this.classList.add('bg-blue-500', 'hover:bg-blue-600');
+                    }, 1500);
+                });
+            });
+            
+            // 显示状态消息
+            function showStatus(message, type) {
+                statusMessage.classList.remove('hidden');
+                statusText.textContent = message;
+                
+                // 根据消息类型设置颜色
+                statusText.className = 'text-sm font-medium';
+                if (type === 'error') {
+                    statusText.classList.add('text-red-500');
+                } else if (type === 'success') {
+                    statusText.classList.add('text-green-500');
+                } else {
+                    statusText.classList.add('text-gray-600');
+                }
+            }
+        });
+    </script>
+</body>
+</html> 
