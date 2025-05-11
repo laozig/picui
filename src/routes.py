@@ -178,190 +178,120 @@ async def process_image(file_location: str, original_filename: str, client_ip: s
         logger.error(f"图片处理失败: {str(e)}")
         return False
 
-# 图片上传接口
+# 上传图片路由
 @router.post("/upload", tags=["图片"], summary="上传图片", description="上传图片文件并返回访问URL")
 async def upload_image(
-    file: UploadFile = File(..., description="要上传的图片文件"), 
+    file: Union[UploadFile, List[UploadFile]] = File(..., description="要上传的图片文件"), 
     db: Session = Depends(get_db), 
     request: Request = None
 ):
-    # 获取客户端IP和User-Agent
-    client_ip = request.client.host if request else "unknown"
-    user_agent = request.headers.get("user-agent", "") if request else ""
+    """上传图片并返回访问URL"""
+    # 检查是否是多文件上传
+    is_multiple = isinstance(file, list)
+    files = file if is_multiple else [file]
     
-    # 使用信号量控制并发
-    async with upload_semaphore:
+    results = []
+    errors = []
+    
+    for single_file in files:
+        # 获取客户端IP和User-Agent
+        client_ip = request.client.host if request else "unknown"
+        user_agent = request.headers.get("user-agent", "unknown")
+        
         try:
-            # 检查文件类型
-            if not allowed_file(file.filename):
-                error_message = f"不支持的图片格式: {file.filename.rsplit('.', 1)[1].lower() if '.' in file.filename else '未知格式'}。只允许上传以下格式: {', '.join(sorted(ALLOWED_EXTENSIONS))}"
-                
-                # 记录失败日志
-                log_entry = UploadLog(
-                    original_filename=file.filename,
-                    status="failed",
-                    error_message=error_message,
-                    ip_address=client_ip,
-                    user_agent=user_agent
-                )
-                db.add(log_entry)
-                db.commit()
-                
-                raise HTTPException(
-                    status_code=400,
-                    detail=error_message
-                )
+            # 检查图片类型
+            if not allowed_file(single_file.filename):
+                logger.warning(f"不支持的文件类型: {single_file.filename}")
+                errors.append(f"不支持的图片格式: {single_file.filename}")
+                continue
             
-            # 读取文件内容
-            contents = await file.read()
-            
-            # 检查文件大小
-            if len(contents) > MAX_SIZE:
-                error_message = f"文件过大: {len(contents)/1024/1024:.2f}MB。文件大小不能超过{MAX_SIZE/1024/1024:.0f}MB"
-                
-                # 记录失败日志
-                log_entry = UploadLog(
-                    original_filename=file.filename,
-                    status="failed",
-                    error_message=error_message,
-                    ip_address=client_ip,
-                    user_agent=user_agent
-                )
-                db.add(log_entry)
-                db.commit()
-                
-                raise HTTPException(
-                    status_code=400,
-                    detail=error_message
-                )
-            
-            # 重置文件指针
-            await file.seek(0)
-            
-            # 生成唯一文件名
-            file_extension = file.filename.split('.')[-1].lower()
-            unique_filename = f"{uuid.uuid4()}.{file_extension}"
-            file_location = os.path.join(UPLOAD_DIR, unique_filename)
+            # 生成安全文件名
+            original_filename = single_file.filename
+            ext = os.path.splitext(original_filename)[1].lower()
+            random_filename = f"{uuid.uuid4().hex}{ext}"
             
             # 确保上传目录存在
             os.makedirs(UPLOAD_DIR, exist_ok=True)
             
-            # 保存文件
-            with open(file_location, "wb") as buffer:
-                shutil.copyfileobj(file.file, buffer)
+            # 保存图片
+            file_location = os.path.join(UPLOAD_DIR, random_filename)
             
-            # 异步处理图片（优化和检测）
-            is_processed = await process_image(
+            # 边读取边写入以节省内存
+            with open(file_location, "wb") as buffer:
+                while True:
+                    chunk = await single_file.read(8192)  # 每次读取8K
+                    if not chunk:
+                        break
+                    buffer.write(chunk)
+            
+            logger.info(f"图片已保存: {file_location}")
+            
+            # 处理图片(检查、优化、存储信息)
+            img_processing_succeeded = await process_image(
                 file_location, 
-                file.filename, 
+                original_filename, 
                 client_ip, 
                 user_agent, 
                 db
             )
             
-            if not is_processed:
-                # 如果处理失败，抛出异常
-                raise HTTPException(
-                    status_code=403,
-                    detail="图片处理失败或内容不符合规范"
-                )
+            if not img_processing_succeeded:
+                errors.append(f"图片处理失败: {original_filename}")
+                # 删除图片文件
+                try:
+                    os.remove(file_location)
+                except:
+                    pass
+                continue
             
-            # 获取文件大小（KB）
-            file_size = os.path.getsize(file_location) / 1024
-            
-            # 获取MIME类型
-            import mimetypes
-            mime_type = mimetypes.guess_type(file_location)[0]
-            if not mime_type:
-                mime_type = f"image/{file_extension}"
-            
-            # 保存到数据库
-            db_image = Image(
-                filename=unique_filename,
-                original_filename=file.filename,
-                size=file_size,
-                mime_type=mime_type
-            )
-            
-            db.add(db_image)
-            db.commit()
-            db.refresh(db_image)
-            
-            # 记录上传成功日志
-            log_entry = UploadLog(
-                filename=unique_filename,
-                original_filename=file.filename,
-                mime_type=mime_type,
-                size=file_size,
-                status="success",
-                ip_address=client_ip,
-                user_agent=user_agent
-            )
-            db.add(log_entry)
-            db.commit()
+            # 读取图片信息
+            img_info = db.query(Image).filter(Image.filename == random_filename).first()
             
             # 为图片生成短链接
-            short_code = generate_short_link(
-                filename=unique_filename,
-                db=db
-            )
+            short_code = generate_short_link(random_filename, db=db)
             
-            # 动态生成URL
+            # 构建基础URL
             if request:
-                # 如果请求可用，从请求中构建URL
-                host = request.headers.get("host", "localhost")
-                scheme = request.headers.get("x-forwarded-proto", "http")
-                base_url = f"{scheme}://{host}"
-                file_url = f"{base_url}/images/{unique_filename}"
-                short_url = f"{base_url}/s/{short_code}"
-                
-                # 记录上传信息到日志
-                user_info = "匿名用户"
-                logger.info(f"{client_ip} {user_info} 上传了 {file.filename}")
+                base_url = f"{request.url.scheme}://{request.url.netloc}"
             else:
-                # 如果请求不可用，使用环境变量中的BASE_URL
-                file_url = f"{BASE_URL}/images/{unique_filename}"
-                short_url = f"{BASE_URL}/s/{short_code}"
-                
-                # 记录上传信息到日志（无法获取IP时）
-                user_info = "匿名用户"
-                logger.info(f"未知IP {user_info} 上传了 {file.filename}")
+                base_url = BASE_URL
             
-            # 返回完整结果
-            return {
-                "url": file_url,
+            # 构建URL
+            url = f"{base_url}/images/{random_filename}"
+            short_url = f"{base_url}/s/{short_code}"
+            
+            # 构建HTML和Markdown代码
+            html_code = f'<img src="{url}" alt="{original_filename}" />'
+            markdown_code = f'![{original_filename}]({url})'
+            
+            # 添加到结果
+            results.append({
+                "url": url,
                 "short_url": short_url,
-                "filename": unique_filename,
-                "original_filename": file.filename,
-                "size": file_size,
-                "mime_type": mime_type,
-                "id": db_image.id,
-                "html_code": f'<img src="{file_url}" alt="{file.filename}" />',
-                "markdown_code": f"![{file.filename}]({file_url})"
-            }
+                "filename": random_filename,
+                "original_filename": original_filename,
+                "size": img_info.size_kb if img_info else 0,
+                "mime_type": img_info.mime_type if img_info else "image/jpeg",
+                "id": img_info.id if img_info else 0,
+                "html_code": html_code,
+                "markdown_code": markdown_code
+            })
         except Exception as e:
-            # 记录错误
-            logger.error(f"上传失败: {str(e)}")
-            
-            # 记录到数据库日志
-            try:
-                log_entry = UploadLog(
-                    original_filename=file.filename,
-                    status="failed",
-                    error_message=str(e),
-                    ip_address=client_ip,
-                    user_agent=user_agent
-                )
-                db.add(log_entry)
-                db.commit()
-            except:
-                pass
-            
-            # 抛出HTTP异常
-            raise HTTPException(
-                status_code=500,
-                detail=f"上传失败: {str(e)}"
-            )
+            logger.error(f"处理文件 {single_file.filename} 时出错: {str(e)}", exc_info=True)
+            errors.append(f"处理文件失败: {single_file.filename}")
+    
+    # 处理返回结果
+    if len(results) == 0:
+        # 所有文件都处理失败
+        error_message = "上传失败: " + ", ".join(errors)
+        raise HTTPException(status_code=500, detail=error_message)
+    
+    # 如果只上传了一个文件且成功，返回单个结果
+    if not is_multiple and len(results) == 1:
+        return results[0]
+    
+    # 否则返回结果数组
+    return results
 
 # 图片删除接口
 @router.delete("/img/{filename}", tags=["图片"], summary="删除图片", description="删除已上传的图片")
@@ -396,26 +326,61 @@ async def delete_image(
 # 短链接重定向
 @router.get("/s/{code}", tags=["短链接"], summary="访问短链接", description="通过短链接代码访问图片")
 async def access_short_link(code: str, db: Session = Depends(get_db)):
-    # 查询短链接
-    short_link = db.query(ShortLink).filter(ShortLink.code == code).first()
-    if not short_link:
-        raise HTTPException(status_code=404, detail="短链接不存在")
-    
-    # 检查是否过期
-    if short_link.is_expired():
-        raise HTTPException(status_code=410, detail="短链接已过期")
+    """通过短链接访问图片"""
+    # 记录访问信息
+    logger.info(f"短链接访问: code={code}")
     
     try:
-        # 增加访问计数
-        short_link.increase_access_count()
-        db.commit()
+        # 查询短链接
+        short_link = db.query(ShortLink).filter(ShortLink.code == code).first()
+        if not short_link:
+            logger.warning(f"短链接不存在: code={code}")
+            raise HTTPException(status_code=404, detail="短链接不存在")
         
-        # 重定向到原始图片
-        return RedirectResponse(url=f"/images/{short_link.target_file}")
+        # 检查是否过期
+        if short_link.is_expired():
+            logger.warning(f"短链接已过期: code={code}, expire_at={short_link.expire_at}")
+            raise HTTPException(status_code=410, detail="短链接已过期")
+        
+        # 检查目标文件是否存在
+        file_path = os.path.join(UPLOAD_DIR, short_link.target_file)
+        if not os.path.exists(file_path):
+            logger.error(f"短链接指向的文件不存在: code={code}, file={short_link.target_file}, path={file_path}")
+            raise HTTPException(status_code=404, detail="图片文件不存在或已被删除")
+        
+        try:
+            # 增加访问计数
+            short_link.increase_access_count()
+            db.commit()
+            
+            # 获取图片信息，用于生成正确的MIME类型
+            img_info = db.query(Image).filter(Image.filename == short_link.target_file).first()
+            
+            # 重定向到原始图片 - 采用两种方式尝试
+            # 1. 优先使用文件响应直接返回图片，避免重定向
+            if img_info:
+                logger.info(f"短链接直接访问图片: code={code}, file={short_link.target_file}, mime={img_info.mime_type}")
+                return FileResponse(
+                    file_path, 
+                    media_type=img_info.mime_type, 
+                    filename=img_info.original_filename, 
+                    content_disposition_type="inline"
+                )
+            
+            # 2. 如果没有找到图片信息，使用重定向
+            logger.info(f"短链接重定向: code={code} -> /images/{short_link.target_file}")
+            return RedirectResponse(url=f"/images/{short_link.target_file}")
+            
+        except Exception as e:
+            db.rollback()
+            logger.error(f"短链接访问失败: code={code}, error={str(e)}", exc_info=True)
+            raise HTTPException(status_code=500, detail=f"访问短链接时发生错误: {str(e)}")
+    except HTTPException:
+        # 传递HTTP异常
+        raise
     except Exception as e:
-        db.rollback()
-        logger.error(f"短链接访问失败: {str(e)}")
-        raise HTTPException(status_code=500, detail=f"访问短链接时发生错误: {str(e)}")
+        logger.error(f"短链接处理异常: code={code}, error={str(e)}", exc_info=True)
+        raise HTTPException(status_code=500, detail=f"处理短链接时发生未知错误")
 
 # 图片查看路由
 @router.get("/images/{filename}", tags=["图片"], summary="查看图片", description="访问上传的图片")
@@ -460,38 +425,64 @@ async def get_watermarked_image(
     # 获取图片元数据
     img_info = db.query(Image).filter(Image.filename == filename).first()
     
-    # 在线程池中运行水印添加（CPU密集型任务）
-    loop = asyncio.get_event_loop()
-    watermarked_img = await loop.run_in_executor(
-        thread_pool,
-        lambda: add_watermark(file_path, text, position, opacity)
-    )
-    
-    if not watermarked_img:
-        raise HTTPException(status_code=500, detail="添加水印失败")
-    
-    # 将图片转换为字节
-    img_bytes = io.BytesIO()
-    
-    # 在线程池中运行图片保存操作
-    await loop.run_in_executor(
-        thread_pool,
-        lambda: watermarked_img.save(img_bytes, format=watermarked_img.format or "JPEG")
-    )
-    
-    img_bytes.seek(0)
-    
-    # 设置内容类型
-    media_type = img_info.mime_type if img_info else "image/jpeg"
-    
-    # 根据是否下载设置响应头
-    if download:
-        filename_display = f"watermark_{filename}"
-        headers = {"Content-Disposition": f'attachment; filename="{filename_display}"'}
-    else:
-        headers = {}
-    
-    return StreamingResponse(img_bytes, media_type=media_type, headers=headers)
+    try:
+        # 在线程池中运行水印添加（CPU密集型任务）
+        loop = asyncio.get_event_loop()
+        watermarked_img = await loop.run_in_executor(
+            thread_pool,
+            lambda: add_watermark(file_path, text, position, opacity)
+        )
+        
+        if not watermarked_img:
+            raise HTTPException(status_code=500, detail="添加水印失败")
+        
+        # 将图片转换为字节
+        img_bytes = io.BytesIO()
+        
+        # 在线程池中运行图片保存操作
+        await loop.run_in_executor(
+            thread_pool,
+            lambda: watermarked_img.save(img_bytes, format=watermarked_img.format or "JPEG", quality=95)
+        )
+        
+        img_bytes.seek(0)
+        
+        # 设置内容类型 - 确保使用正确的MIME类型
+        media_type = img_info.mime_type if img_info else "image/jpeg"
+        
+        # 生成文件名 - 用于下载时的文件名
+        original_name = img_info.original_filename if img_info else filename
+        filename_base = os.path.splitext(original_name)[0]
+        ext = os.path.splitext(filename)[1] if "." in filename else ".jpg"
+        download_filename = f"watermark_{filename_base}{ext}"
+        
+        # 根据是否下载设置响应头
+        if download:
+            headers = {
+                "Content-Disposition": f'attachment; filename="{download_filename}"',
+                "Access-Control-Expose-Headers": "Content-Disposition"
+            }
+        else:
+            # 修改预览模式的headers设置，禁用缓存以确保预览功能正常
+            headers = {
+                "Content-Disposition": f'inline; filename="{download_filename}"',
+                "Cache-Control": "no-cache, no-store, must-revalidate",  # 禁用缓存
+                "Pragma": "no-cache",
+                "Expires": "0"
+            }
+        
+        # 添加日志记录以便调试
+        logger.info(f"水印图片准备返回: filename={filename}, download={download}, media_type={media_type}, headers={headers}")
+        
+        return StreamingResponse(
+            img_bytes, 
+            media_type=media_type, 
+            headers=headers
+        )
+    except Exception as e:
+        # 添加详细的错误日志
+        logger.error(f"水印处理失败: {str(e)}", exc_info=True)
+        raise HTTPException(status_code=500, detail=f"处理水印图片时出错: {str(e)}")
 
 # 创建临时外链
 @router.post("/create-temp-link/{image_id}", tags=["短链接"], summary="创建临时外链", description="为图片创建带有有效期的临时外链")

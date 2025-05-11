@@ -94,9 +94,38 @@ def add_watermark(img_path: str, text: str, position: str = "center",
     - 否则保存图片并返回True/False表示成功/失败
     """
     try:
+        logger.info(f"开始添加水印: 文件={img_path}, 文字='{text}', 位置={position}, 不透明度={opacity}")
+        
         # 打开原图片
-        with PILImage.open(img_path) as img:
-            # 创建一个透明的图层作为水印
+        img = PILImage.open(img_path)
+        original_mode = img.mode
+        original_format = img.format
+        logger.info(f"原始图片信息: 尺寸={img.size}, 模式={original_mode}, 格式={original_format}")
+        
+        # 优化内存使用 - 处理大图像时先缩小
+        if img.width > 3000 or img.height > 3000:
+            img = img.copy()  # 创建副本避免修改原图
+            img.thumbnail((3000, 3000), PILImage.LANCZOS)
+            logger.info(f"图像过大，已缩小到 {img.size}")
+        
+        # 保存格式信息到图片对象，以便后续使用
+        if not hasattr(img, 'format') or not img.format:
+            # 从文件扩展名猜测格式
+            ext = os.path.splitext(img_path)[1].lower()
+            if ext == '.jpg' or ext == '.jpeg':
+                img.format = 'JPEG'
+            elif ext == '.png':
+                img.format = 'PNG'
+            elif ext == '.gif':
+                img.format = 'GIF'
+            elif ext == '.webp':
+                img.format = 'WEBP'
+            else:
+                img.format = 'JPEG'  # 默认用JPEG
+            logger.info(f"从文件名推断格式: {img.format}")
+        
+        # 创建一个透明的图层作为水印
+        try:
             watermark = PILImage.new('RGBA', img.size, (0, 0, 0, 0))
             
             # 创建绘图对象
@@ -104,16 +133,22 @@ def add_watermark(img_path: str, text: str, position: str = "center",
             draw = ImageDraw.Draw(watermark)
             
             # 尝试加载系统字体
+            font = None
             try:
                 # 对于Windows系统
                 font = ImageFont.truetype('arial.ttf', size=int(min(img.size) / 20))
-            except:
+                logger.info("使用Windows系统字体: arial.ttf")
+            except Exception as e:
+                logger.warning(f"加载Windows字体失败: {str(e)}")
                 try:
                     # 对于Linux系统
                     font = ImageFont.truetype('/usr/share/fonts/truetype/dejavu/DejaVuSans.ttf', size=int(min(img.size) / 20))
-                except:
+                    logger.info("使用Linux系统字体: DejaVuSans.ttf")
+                except Exception as e:
+                    logger.warning(f"加载Linux字体失败: {str(e)}")
                     # 降级到默认字体
                     font = ImageFont.load_default()
+                    logger.info("使用默认字体")
             
             # 获取文本大小 - 使用textbbox或fallback到textsize
             try:
@@ -121,59 +156,95 @@ def add_watermark(img_path: str, text: str, position: str = "center",
                 left, top, right, bottom = draw.textbbox((0, 0), text, font=font)
                 text_width = right - left
                 text_height = bottom - top
-            except AttributeError:
+                logger.info(f"使用textbbox获取文本尺寸: 宽={text_width}, 高={text_height}")
+            except AttributeError as e:
+                logger.warning(f"textbbox不可用: {str(e)}")
                 # 旧版Pillow使用textsize
                 text_width, text_height = draw.textsize(text, font=font)
+                logger.info(f"使用textsize获取文本尺寸: 宽={text_width}, 高={text_height}")
             
             # 根据position确定水印位置
             if position == "center":
-                position = ((img.size[0] - text_width) / 2, (img.size[1] - text_height) / 2)
+                pos = ((img.size[0] - text_width) / 2, (img.size[1] - text_height) / 2)
             elif position == "bottom-right":
-                position = (img.size[0] - text_width - 20, img.size[1] - text_height - 20)
+                pos = (img.size[0] - text_width - 20, img.size[1] - text_height - 20)
             elif position == "bottom-left":
-                position = (20, img.size[1] - text_height - 20)
+                pos = (20, img.size[1] - text_height - 20)
             elif position == "top-right":
-                position = (img.size[0] - text_width - 20, 20)
+                pos = (img.size[0] - text_width - 20, 20)
             elif position == "top-left":
-                position = (20, 20)
+                pos = (20, 20)
+            else:
+                # 默认使用右下角
+                pos = (img.size[0] - text_width - 20, img.size[1] - text_height - 20)
+                logger.warning(f"未知的位置值: {position}，默认使用右下角")
+            
+            logger.info(f"水印位置: {pos}")
             
             # 绘制水印文字，半透明黑色背景
             padding = 10
             draw.rectangle(
                 [
-                    position[0] - padding, 
-                    position[1] - padding, 
-                    position[0] + text_width + padding, 
-                    position[1] + text_height + padding
+                    pos[0] - padding, 
+                    pos[1] - padding, 
+                    pos[0] + text_width + padding, 
+                    pos[1] + text_height + padding
                 ], 
                 fill=(0, 0, 0, int(128 * opacity))
             )
             
             # 绘制水印文字，白色
-            draw.text(position, text, font=font, fill=(255, 255, 255, int(255 * opacity)))
+            draw.text(pos, text, font=font, fill=(255, 255, 255, int(255 * opacity)))
             
-            # 确保原图有alpha通道
-            if img.mode != 'RGBA':
-                img = img.convert('RGBA')
+            # 转换图片模式处理
+            result = None
             
-            # 合并原图和水印
-            result = PILImage.alpha_composite(img, watermark)
+            if original_mode == 'RGBA':
+                # 如果原图已经是RGBA，直接合成
+                result = PILImage.alpha_composite(img, watermark)
+            else:
+                # 尝试转换为RGBA再合成
+                try:
+                    img_rgba = img.convert('RGBA')
+                    result = PILImage.alpha_composite(img_rgba, watermark)
+                    # 转回原来的模式
+                    result = result.convert(original_mode)
+                except Exception as e:
+                    logger.error(f"图片模式转换失败: {str(e)}")
+                    # 如果转换失败，使用原始图片
+                    result = img.copy()
             
-            # 转回原来的模式
-            if img.mode != 'RGBA':
-                result = result.convert(img.mode)
+            # 保存原始格式信息
+            if original_format:
+                result.format = original_format
+            
+            logger.info(f"水印添加完成: 结果图片尺寸={result.size}, 模式={result.mode}, 格式={result.format}")
             
             # 如果指定了输出路径，则保存图片
             if output_path:
-                result.save(output_path)
+                logger.info(f"保存水印图片到: {output_path}")
+                if result.format == 'JPEG':
+                    result.save(output_path, format=result.format, quality=95)
+                else:
+                    result.save(output_path, format=result.format)
                 return True
             else:
                 return result
+                
+        except Exception as inner_e:
+            logger.error(f"处理水印图层时出错: {str(inner_e)}", exc_info=True)
+            # 如果水印处理出错，返回原始图片作为后备方案
+            logger.warning("返回原始图片作为后备方案")
+            return img
     except Exception as e:
-        logger.error(f"添加水印失败: {str(e)}")
+        logger.error(f"添加水印失败: {str(e)}", exc_info=True)
         if output_path:
             return False
-        return None
+        # 尝试返回原图作为后备方案
+        try:
+            return PILImage.open(img_path)
+        except:
+            return None
 
 # 简单的离线图片内容检测
 def offline_image_check(file_path: str, skin_threshold: float = 0.5) -> bool:

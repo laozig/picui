@@ -165,7 +165,10 @@
                 </a>
                 {% endif %}
 
-                {% for p in range(max(1, page - 2), min(total_pages + 1, page + 3)) %}
+                {% set start_page = page - 2 if page - 2 > 0 else 1 %}
+                {% set end_page = page + 2 if page + 2 < total_pages else total_pages %}
+                
+                {% for p in range(start_page, end_page + 1) %}
                 <a href="/admin/short-links?page={{ p }}&search={{ search }}" class="bg-white border border-gray-300 text-gray-500 hover:bg-gray-50 {% if p == page %}active{% endif %}">
                     {{ p }}
                 </a>

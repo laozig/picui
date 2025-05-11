@@ -157,6 +157,22 @@
             -webkit-background-clip: text;
             -webkit-text-fill-color: transparent;
         }
+        
+        /* 水印预览动画 */
+        .watermark-preview-area {
+            transition: all 0.3s ease;
+        }
+        
+        .watermark-preview-area img {
+            opacity: 0;
+            transform: scale(0.95);
+            transition: all 0.5s ease;
+        }
+        
+        .watermark-preview-area img.loaded {
+            opacity: 1;
+            transform: scale(1);
+        }
     </style>
 </head>
 <body class="min-h-screen flex items-center justify-center py-10">
@@ -186,9 +202,9 @@
                     </svg>
                 </div>
                 <p class="text-gray-700 text-lg mb-4">拖拽图片到这里或</p>
-                <label class="inline-block bg-blue-500 text-white px-6 py-3 rounded-lg cursor-pointer hover:bg-blue-600 transition-colors btn shadow-md">
+                <label id="select-image-btn" class="inline-block bg-blue-500 text-white px-6 py-3 rounded-lg cursor-pointer hover:bg-blue-600 transition-colors btn shadow-md">
                     选择图片
-                    <input id="file-input" type="file" accept="image/*" class="hidden" />
+                    <input id="file-input" type="file" accept="image/*" multiple class="hidden" />
                 </label>
                 <div class="text-sm text-gray-500 mt-5">
                     <p class="text-base">支持多种图片格式 (最大 <span id="max-size" class="font-semibold text-blue-600">15MB</span>)</p>
@@ -199,106 +215,25 @@
             </div>
         </div>
         
-        <!-- Token 输入框 -->
-        <div class="mb-6">
-            <div class="max-w-md mx-auto">
-                <label for="token-input" class="block text-sm font-medium text-gray-700 mb-2 flex items-center">
-                    <svg xmlns="http://www.w3.org/2000/svg" class="h-4 w-4 mr-1" fill="none" viewBox="0 0 24 24" stroke="currentColor">
-                        <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M12 15v2m-6 4h12a2 2 0 002-2v-6a2 2 0 00-2-2H6a2 2 0 00-2 2v6a2 2 0 002 2zm10-10V7a4 4 0 00-8 0v4h8z" />
-                    </svg>
-                    访问令牌
-                </label>
-                <input id="token-input" type="password" class="w-full p-3 border rounded-lg focus:outline-none focus:ring-2 focus:ring-blue-500" placeholder="请输入访问令牌" />
-            </div>
+        <!-- 图片预览区域 -->
+        <div id="preview-area" class="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-4 mt-4 hidden">
+            <!-- 预览内容会在JS中动态生成 -->
         </div>
-        <!-- 上传按钮 -->
-        <div class="text-center mb-8">
-            <button id="upload-button" class="bg-gradient-to-r from-green-500 to-emerald-600 text-white px-10 py-3 rounded-lg transition-colors btn font-semibold text-lg disabled:opacity-50 disabled:cursor-not-allowed shadow-md" disabled>
+        
+        <!-- 上传按钮区域 -->
+        <div id="upload-action" class="mt-6 text-center hidden">
+            <button id="upload-btn" class="bg-blue-500 hover:bg-blue-600 text-white px-8 py-3 rounded-lg shadow-md btn">
                 上传图片
             </button>
         </div>
         
         <!-- 上传结果区域 -->
-        <div id="result-area" class="hidden">
-            <div class="border rounded-xl overflow-hidden shadow-lg card bg-white">
-                <div class="bg-gradient-to-r from-blue-500 to-blue-600 p-4">
-                    <h2 class="font-semibold text-white text-lg flex items-center">
-                        <svg xmlns="http://www.w3.org/2000/svg" class="h-5 w-5 mr-2" fill="none" viewBox="0 0 24 24" stroke="currentColor">
-                            <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M9 12l2 2 4-4m6 2a9 9 0 11-18 0 9 9 0 0118 0z" />
-                        </svg>
-                        上传成功
-                    </h2>
-                </div>
-                <div class="p-6">
-                    <!-- 图片预览 -->
-                    <div class="mb-6 text-center">
-                        <img id="image-preview" class="image-preview mx-auto" src="" alt="预览图">
-                    </div>
-                    
-                    <!-- 图片链接 -->
-                    <div class="mb-4 input-group">
-                        <label class="block text-sm font-medium text-gray-700 mb-2 flex items-center">
-                            <svg xmlns="http://www.w3.org/2000/svg" class="h-4 w-4 mr-1" fill="none" viewBox="0 0 24 24" stroke="currentColor">
-                                <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M13.828 10.172a4 4 0 00-5.656 0l-4 4a4 4 0 105.656 5.656l1.102-1.101m-.758-4.899a4 4 0 005.656 0l4-4a4 4 0 00-5.656-5.656l-1.1 1.1" />
-                            </svg>
-                            图片链接
-                        </label>
-                        <div class="flex">
-                            <input id="image-url" type="text" readonly class="flex-grow p-3 border rounded-l-lg focus:outline-none focus:ring-2 focus:ring-blue-500 bg-gray-50" />
-                            <button id="copy-url" class="bg-blue-500 text-white px-4 py-3 rounded-r-lg hover:bg-blue-600 focus:outline-none btn copy-btn">
-                                复制
-                            </button>
-                        </div>
-                    </div>
-                    
-                    <!-- HTML代码 -->
-                    <div class="mb-4 input-group">
-                        <label class="block text-sm font-medium text-gray-700 mb-2 flex items-center">
-                            <svg xmlns="http://www.w3.org/2000/svg" class="h-4 w-4 mr-1" fill="none" viewBox="0 0 24 24" stroke="currentColor">
-                                <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M10 20l4-16m4 4l4 4-4 4M6 16l-4-4 4-4" />
-                            </svg>
-                            HTML代码
-                        </label>
-                        <div class="flex">
-                            <input id="html-code" type="text" readonly class="flex-grow p-3 border rounded-l-lg focus:outline-none focus:ring-2 focus:ring-blue-500 bg-gray-50" />
-                            <button id="copy-html" class="bg-blue-500 text-white px-4 py-3 rounded-r-lg hover:bg-blue-600 focus:outline-none btn copy-btn">
-                                复制
-                            </button>
-                        </div>
-                    </div>
-                    
-                    <!-- Markdown代码 -->
-                    <div class="input-group">
-                        <label class="block text-sm font-medium text-gray-700 mb-2 flex items-center">
-                            <svg xmlns="http://www.w3.org/2000/svg" class="h-4 w-4 mr-1" fill="none" viewBox="0 0 24 24" stroke="currentColor">
-                                <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M7 8h10M7 12h4m1 8l-4-4H5a2 2 0 01-2-2V6a2 2 0 012-2h14a2 2 0 012 2v8a2 2 0 01-2 2h-3l-4 4z" />
-                            </svg>
-                            Markdown代码
-                        </label>
-                        <div class="flex">
-                            <input id="md-code" type="text" readonly class="flex-grow p-3 border rounded-l-lg focus:outline-none focus:ring-2 focus:ring-blue-500 bg-gray-50" />
-                            <button id="copy-md" class="bg-blue-500 text-white px-4 py-3 rounded-r-lg hover:bg-blue-600 focus:outline-none btn copy-btn">
-                                复制
-                            </button>
-                        </div>
-                    </div>
-                    
-                    <!-- 快捷操作按钮 -->
-                    <div class="mt-6 flex justify-center space-x-4">
-                        <button id="upload-another" class="bg-gray-100 hover:bg-gray-200 text-gray-700 px-4 py-2 rounded-lg transition-colors btn flex items-center">
-                            <svg xmlns="http://www.w3.org/2000/svg" class="h-4 w-4 mr-1" fill="none" viewBox="0 0 24 24" stroke="currentColor">
-                                <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M4 16v1a3 3 0 003 3h10a3 3 0 003-3v-1m-4-8l-4-4m0 0l-4 4m4-4v12" />
-                            </svg>
-                            上传另一张
-                        </button>
-                        <a id="open-image" href="#" target="_blank" class="bg-gray-100 hover:bg-gray-200 text-gray-700 px-4 py-2 rounded-lg transition-colors btn flex items-center">
-                            <svg xmlns="http://www.w3.org/2000/svg" class="h-4 w-4 mr-1" fill="none" viewBox="0 0 24 24" stroke="currentColor">
-                                <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M10 6H6a2 2 0 00-2 2v10a2 2 0 002 2h10a2 2 0 002-2v-4M14 4h6m0 0v6m0-6L10 14" />
-                            </svg>
-                            在新窗口打开
-                        </a>
-                    </div>
-                </div>
+        <div id="result-area" class="mt-8 hidden">
+            <!-- 结果内容会在JS中动态生成 -->
+            <div class="mt-6 text-center">
+                <button id="upload-another" class="w-full py-3 bg-blue-500 hover:bg-blue-600 text-white rounded-lg transition">
+                    <i class="fas fa-upload mr-2"></i> 再次上传
+                </button>
             </div>
         </div>
         
@@ -318,25 +253,18 @@
             // 获取DOM元素
             const dropArea = document.getElementById('drop-area');
             const fileInput = document.getElementById('file-input');
-            const tokenInput = document.getElementById('token-input');
-            const uploadButton = document.getElementById('upload-button');
+            const previewArea = document.getElementById('preview-area');
+            const uploadAction = document.getElementById('upload-action');
+            const uploadBtn = document.getElementById('upload-btn');
             const resultArea = document.getElementById('result-area');
-            const imagePreview = document.getElementById('image-preview');
-            const imageUrl = document.getElementById('image-url');
-            const htmlCode = document.getElementById('html-code');
-            const mdCode = document.getElementById('md-code');
             const statusMessage = document.getElementById('status-message');
             const statusText = document.getElementById('status-text');
-            const copyUrlBtn = document.getElementById('copy-url');
-            const copyHtmlBtn = document.getElementById('copy-html');
-            const copyMdBtn = document.getElementById('copy-md');
             const formatList = document.getElementById('format-list');
             const maxSizeSpan = document.getElementById('max-size');
             const uploadAnother = document.getElementById('upload-another');
-            const openImage = document.getElementById('open-image');
             
             // 当前选择的文件
-            let selectedFile = null;
+            let selectedFiles = [];
             
             // 支持的格式和最大文件大小
             let supportedFormats = [];
@@ -401,211 +329,457 @@
             
             function handleDrop(e) {
                 const dt = e.dataTransfer;
-                const file = dt.files[0];
-                handleFile(file);
+                const files = dt.files;
+                handleFiles(files);
             }
             
             // 处理文件选择
             fileInput.addEventListener('change', function() {
-                if (this.files && this.files[0]) {
-                    handleFile(this.files[0]);
+                if (this.files && this.files.length > 0) {
+                    handleFiles(this.files);
                 }
             });
             
             // 处理选择或拖拽的文件
-            function handleFile(file) {
-                // 检查文件是否为图片
-                if (!file.type.startsWith('image/')) {
-                    showStatus('错误: 请选择图片文件', 'error');
-                    return;
-                }
+            function handleFiles(files) {
+                // 清空之前的选择
+                selectedFiles = [];
+                previewArea.innerHTML = '';
                 
-                // 检查文件扩展名是否支持
-                const extension = file.name.split('.').pop().toLowerCase();
-                if (supportedFormats.length > 0 && !supportedFormats.includes(extension)) {
-                    showStatus(`错误: 不支持的图片格式 ${extension}`, 'error');
-                    return;
-                }
+                // 将FileList转换为数组并处理
+                Array.from(files).forEach(file => {
+                    // 检查文件是否为图片
+                    if (!file.type.startsWith('image/')) {
+                        showStatus(`错误: ${file.name} 不是图片文件`, 'error');
+                        return;
+                    }
+                    
+                    // 检查文件扩展名是否支持
+                    const extension = file.name.split('.').pop().toLowerCase();
+                    if (supportedFormats.length > 0 && !supportedFormats.includes(extension)) {
+                        showStatus(`错误: 不支持的图片格式 ${extension}`, 'error');
+                        return;
+                    }
+                    
+                    // 检查文件大小
+                    const maxSizeBytes = maxFileSizeMB * 1024 * 1024;
+                    if (file.size > maxSizeBytes) {
+                        showStatus(`错误: ${file.name} 大小超过${maxFileSizeMB}MB`, 'error');
+                        return;
+                    }
+                    
+                    // 添加到选中文件数组
+                    selectedFiles.push(file);
+                    
+                    // 创建预览
+                    createPreview(file);
+                });
                 
-                // 检查文件大小
-                const maxSizeBytes = maxFileSizeMB * 1024 * 1024;
-                if (file.size > maxSizeBytes) {
-                    showStatus(`错误: 文件大小不能超过${maxFileSizeMB}MB`, 'error');
-                    return;
-                }
-                
-                // 保存文件引用
-                selectedFile = file;
-                
-                // 启用上传按钮（只有当token也有值时）
-                checkEnableUploadButton();
-                
-                // 显示文件名
-                showStatus(`已选择: ${file.name}`, 'info');
-            }
-            
-            // 检查是否启用上传按钮
-            function checkEnableUploadButton() {
-                if (selectedFile && tokenInput.value.trim() !== '') {
-                    uploadButton.removeAttribute('disabled');
-                    uploadButton.classList.add('pulse-animation');
+                // 根据是否有有效文件显示上传按钮
+                if (selectedFiles.length > 0) {
+                    uploadAction.classList.remove('hidden');
+                    showStatus(`已选择 ${selectedFiles.length} 个文件准备上传`, 'info');
                 } else {
-                    uploadButton.setAttribute('disabled', 'true');
-                    uploadButton.classList.remove('pulse-animation');
+                    uploadAction.classList.add('hidden');
+                    showStatus('请选择有效的图片文件', 'error');
                 }
             }
             
-            // 监听token输入框变化
-            tokenInput.addEventListener('input', checkEnableUploadButton);
+            // 创建图片预览
+            function createPreview(file) {
+                // 显示预览区域
+                previewArea.classList.remove('hidden');
+                
+                // 创建预览卡片
+                const previewCard = document.createElement('div');
+                previewCard.className = 'border rounded p-4 relative';
+                
+                // 创建预览图片
+                const img = document.createElement('img');
+                img.className = 'h-40 w-full object-contain mb-2';
+                
+                // 创建文件信息
+                const fileInfo = document.createElement('div');
+                fileInfo.className = 'text-sm text-gray-600';
+                fileInfo.textContent = `${file.name} (${(file.size / 1024).toFixed(1)} KB)`;
+                
+                // 创建进度条容器
+                const progressContainer = document.createElement('div');
+                progressContainer.className = 'h-2 bg-gray-200 rounded-full mt-2 hidden';
+                
+                // 创建进度条
+                const progressBar = document.createElement('div');
+                progressBar.className = 'h-full bg-green-500 rounded-full';
+                progressBar.style.width = '0%';
+                
+                // 添加进度条到容器
+                progressContainer.appendChild(progressBar);
+                
+                // 添加所有元素到预览卡片
+                previewCard.appendChild(img);
+                previewCard.appendChild(fileInfo);
+                previewCard.appendChild(progressContainer);
+                
+                // 添加预览卡片到预览区域
+                previewArea.appendChild(previewCard);
+                
+                // 读取并显示图片预览
+                const reader = new FileReader();
+                reader.onload = function(e) {
+                    img.src = e.target.result;
+                };
+                reader.readAsDataURL(file);
+                
+                // 存储引用，用于后续更新进度
+                file.previewElement = previewCard;
+                file.progressContainer = progressContainer;
+                file.progressBar = progressBar;
+            }
             
             // 上传按钮点击事件
-            uploadButton.addEventListener('click', uploadFile);
+            uploadBtn.addEventListener('click', uploadFiles);
             
             // 上传另一张按钮点击事件
             uploadAnother.addEventListener('click', function() {
-                // 隐藏结果区域
+                // 隐藏结果区域和预览区域
                 resultArea.classList.add('hidden');
-                // 清空状态
-                selectedFile = null;
-                // 禁用上传按钮
-                uploadButton.setAttribute('disabled', 'true');
-                uploadButton.classList.remove('pulse-animation');
-                // 清空文件输入
+                previewArea.classList.add('hidden');
+                // 显示上传区域
+                dropArea.parentElement.classList.remove('hidden');
+                // 清空文件
+                selectedFiles = [];
                 fileInput.value = '';
+                // 隐藏上传按钮
+                uploadAction.classList.add('hidden');
                 // 隐藏状态消息
                 statusMessage.classList.add('hidden');
             });
             
-            function uploadFile() {
-                if (!selectedFile || tokenInput.value.trim() === '') return;
+            // 上传文件
+            async function uploadFiles() {
+                if (selectedFiles.length === 0) return;
                 
-                // 创建FormData
-                const formData = new FormData();
-                formData.append('file', selectedFile);
-                formData.append('token', tokenInput.value.trim());
+                // 显示上传状态
+                uploadBtn.textContent = '上传中...';
+                uploadBtn.disabled = true;
+                showStatus(`开始上传 ${selectedFiles.length} 个文件...`, 'info');
                 
-                // 显示上传中状态
-                uploadButton.textContent = '上传中...';
-                uploadButton.setAttribute('disabled', 'true');
-                uploadButton.classList.remove('pulse-animation');
-                showStatus('上传中...', 'info');
+                // 显示所有进度条
+                selectedFiles.forEach(file => {
+                    file.progressContainer.classList.remove('hidden');
+                });
                 
-                // 发送上传请求
-                fetch('/upload', {
-                    method: 'POST',
-                    body: formData
-                })
-                .then(response => {
-                    if (!response.ok) {
-                        return response.json().then(err => {
-                            throw new Error(err.detail || `HTTP错误: ${response.status}`);
-                        });
+                const uploadResults = [];
+                let errorCount = 0;
+                
+                // 依次上传每个文件
+                for (let i = 0; i < selectedFiles.length; i++) {
+                    const file = selectedFiles[i];
+                    
+                    try {
+                        // 创建FormData
+                        const formData = new FormData();
+                        formData.append('file', file);
+                        
+                        // 发送上传请求并监控进度
+                        const result = await uploadWithProgress(file, formData);
+                        uploadResults.push(result);
+                    } catch (error) {
+                        console.error(`上传失败: ${file.name}`, error);
+                        errorCount++;
+                        // 设置进度条为错误状态
+                        file.progressBar.classList.remove('bg-green-500');
+                        file.progressBar.classList.add('bg-red-500');
                     }
-                    return response.json();
-                })
-                .then(data => {
-                    // 显示成功状态
-                    showStatus('上传成功!', 'success');
+                }
+                
+                // 显示上传结果
+                if (uploadResults.length > 0) {
+                    showUploadResults(uploadResults);
+                    showStatus(`上传完成: ${uploadResults.length} 成功, ${errorCount} 失败`, 'success');
+                } else {
+                    showStatus('所有文件上传失败', 'error');
+                }
+                
+                // 恢复上传按钮状态
+                uploadBtn.textContent = '上传图片';
+                uploadBtn.disabled = false;
+            }
+            
+            // 带进度监控的上传
+            function uploadWithProgress(file, formData) {
+                return new Promise((resolve, reject) => {
+                    const xhr = new XMLHttpRequest();
+                    xhr.open('POST', '/upload', true);
                     
-                    // 重置上传按钮
-                    uploadButton.textContent = '上传图片';
-                    checkEnableUploadButton();
+                    // 进度监控
+                    xhr.upload.onprogress = function(e) {
+                        if (e.lengthComputable) {
+                            const percent = Math.round((e.loaded / e.total) * 100);
+                            file.progressBar.style.width = `${percent}%`;
+                        }
+                    };
                     
-                    // 显示结果区域
-                    resultArea.classList.remove('hidden');
+                    // 上传完成
+                    xhr.onload = function() {
+                        if (xhr.status >= 200 && xhr.status < 300) {
+                            // 设置进度条为完成状态
+                            file.progressBar.style.width = '100%';
+                            try {
+                                const response = JSON.parse(xhr.responseText);
+                                resolve(response);
+                            } catch (e) {
+                                reject(new Error('响应解析失败'));
+                            }
+                        } else {
+                            // 设置进度条为错误状态
+                            file.progressBar.classList.remove('bg-green-500');
+                            file.progressBar.classList.add('bg-red-500');
+                            
+                            // 尝试解析错误响应
+                            try {
+                                const errorResponse = JSON.parse(xhr.responseText);
+                                reject(new Error(errorResponse.detail || '上传失败'));
+                            } catch (e) {
+                                reject(new Error(`上传失败: 状态码 ${xhr.status}`));
+                            }
+                        }
+                    };
                     
-                    // 设置图片预览
-                    imagePreview.src = data.url;
+                    // 错误处理
+                    xhr.onerror = function() {
+                        file.progressBar.classList.remove('bg-green-500');
+                        file.progressBar.classList.add('bg-red-500');
+                        reject(new Error('网络错误'));
+                    };
                     
-                    // 设置各种代码格式
-                    imageUrl.value = data.url;
-                    htmlCode.value = `<img src="${data.url}" alt="image">`;
-                    mdCode.value = `![image](${data.url})`;
-                    
-                    // 添加短链接信息
-                    if (data.short_url) {
-                        const shortUrlContainer = document.createElement('div');
-                        shortUrlContainer.className = 'mt-4';
-                        shortUrlContainer.innerHTML = `
-                            <div class="flex flex-col">
-                                <label class="text-sm font-medium text-gray-600 mb-1">短链接:</label>
-                                <div class="flex">
-                                    <input type="text" value="${data.short_url}" readonly 
-                                        class="border rounded-l px-3 py-2 w-full bg-gray-50 focus:outline-none">
-                                    <button class="bg-blue-500 hover:bg-blue-600 text-white px-3 py-2 rounded-r" 
-                                        onclick="navigator.clipboard.writeText('${data.short_url}');this.textContent='已复制!';setTimeout(()=>this.textContent='复制',1500)">
-                                        复制
-                                    </button>
-                                </div>
-                            </div>
-                        `;
-                        // 在mdCode后面插入
-                        mdCode.parentNode.parentNode.insertAdjacentElement('afterend', shortUrlContainer);
-                    }
-                    
-                    // 添加水印链接
-                    const watermarkContainer = document.createElement('div');
-                    watermarkContainer.className = 'mt-6';
-                    watermarkContainer.innerHTML = `
-                        <div class="flex flex-col">
-                            <label class="text-sm font-medium text-gray-600 mb-1">水印功能:</label>
-                            <div class="flex">
-                                <a href="${data.url}/watermark" target="_blank" 
-                                    class="bg-purple-500 hover:bg-purple-600 text-white px-4 py-2 rounded-l transition flex-1 text-center">
-                                    <i class="fas fa-image mr-1"></i> 查看带水印版本
-                                </a>
-                                <a href="${data.url}/watermark?download=true" 
-                                    class="bg-green-500 hover:bg-green-600 text-white px-4 py-2 rounded-r transition flex-1 text-center">
-                                    <i class="fas fa-download mr-1"></i> 下载带水印版本
-                                </a>
-                            </div>
-                            <div class="mt-2 text-xs text-gray-500">
-                                默认水印位置在右下角，可在URL后添加参数 <code>?text=自定义文本&position=位置&opacity=不透明度</code> 进行自定义。
-                                <br>
-                                位置可选：<code>center</code>, <code>bottom-right</code>, <code>bottom-left</code>, <code>top-right</code>, <code>top-left</code>
-                            </div>
-                        </div>
-                    `;
-                    // 在最后插入
-                    resultArea.insertBefore(watermarkContainer, uploadAnother.parentNode);
-                    
-                    // 设置打开链接
-                    openImage.href = data.url;
-                    
-                    // 滚动到结果区域
-                    resultArea.scrollIntoView({behavior: 'smooth'});
-                })
-                .catch(error => {
-                    console.error('上传错误:', error);
-                    showStatus(`上传失败: ${error.message}`, 'error');
-                    
-                    // 重置上传按钮
-                    uploadButton.textContent = '上传图片';
-                    uploadButton.removeAttribute('disabled');
+                    // 发送请求
+                    xhr.send(formData);
                 });
             }
             
-            // 复制功能
-            [copyUrlBtn, copyHtmlBtn, copyMdBtn].forEach(btn => {
-                btn.addEventListener('click', function() {
-                    const input = this.previousElementSibling;
+            // 显示上传结果
+            function showUploadResults(results) {
+                // 清空结果区域
+                resultArea.innerHTML = '';
+                
+                // 隐藏上传区域，显示结果区域
+                dropArea.parentElement.classList.add('hidden');
+                resultArea.classList.remove('hidden');
+                
+                // 确保results始终是数组
+                if (!Array.isArray(results)) {
+                    results = [results];
+                }
+                
+                // 创建结果卡片
+                results.forEach(data => {
+                    const resultCard = document.createElement('div');
+                    resultCard.className = 'bg-white shadow-md rounded-lg p-4 mb-6';
+                    
+                    // 添加图片预览
+                    const imgPreview = document.createElement('img');
+                    imgPreview.src = data.url;
+                    imgPreview.className = 'h-48 mx-auto object-contain mb-4';
+                    imgPreview.alt = data.original_filename;
+                    
+                    // 添加文件信息
+                    const fileInfo = document.createElement('div');
+                    fileInfo.className = 'mb-4';
+                    fileInfo.innerHTML = `
+                        <h3 class="font-medium text-gray-700">${data.original_filename}</h3>
+                        <p class="text-sm text-gray-500">大小: ${data.size}KB</p>
+                    `;
+                    
+                    // 创建链接组
+                    const linkGroup = document.createElement('div');
+                    linkGroup.className = 'flex flex-col space-y-3';
+                    
+                    // 直接链接
+                    const directLink = createLinkInput('直接链接:', data.url);
+                    
+                    // HTML代码
+                    const htmlLink = createLinkInput('HTML代码:', data.html_code);
+                    
+                    // Markdown代码
+                    const mdLink = createLinkInput('Markdown代码:', data.markdown_code);
+                    
+                    // 添加链接组
+                    linkGroup.appendChild(directLink);
+                    linkGroup.appendChild(htmlLink);
+                    linkGroup.appendChild(mdLink);
+                    
+                    // 如果有短链接，添加短链接
+                    if (data.short_url) {
+                        const shortLink = createLinkInput('短链接:', data.short_url);
+                        linkGroup.appendChild(shortLink);
+                    }
+                    
+                    // 增强水印功能 - 添加预览和自定义选项
+                    const watermarkContainer = document.createElement('div');
+                    watermarkContainer.className = 'mt-4';
+                    
+                    // 水印控制面板
+                    const watermarkControls = document.createElement('div');
+                    watermarkControls.className = 'mb-3 p-3 bg-gray-50 rounded-lg';
+                    watermarkControls.innerHTML = `
+                        <div class="mb-2">
+                            <label class="text-sm font-medium text-gray-600 block mb-1">水印文字:</label>
+                            <input type="text" class="watermark-text border rounded px-3 py-1 w-full" value="PicUI图床" placeholder="输入水印文字">
+                        </div>
+                        <div class="grid grid-cols-2 gap-2 mb-2">
+                            <div>
+                                <label class="text-sm font-medium text-gray-600 block mb-1">位置:</label>
+                                <select class="watermark-position border rounded px-3 py-1 w-full">
+                                    <option value="bottom-right">右下角</option>
+                                    <option value="bottom-left">左下角</option>
+                                    <option value="top-right">右上角</option>
+                                    <option value="top-left">左上角</option>
+                                    <option value="center">居中</option>
+                                </select>
+                            </div>
+                            <div>
+                                <label class="text-sm font-medium text-gray-600 block mb-1">透明度:</label>
+                                <input type="range" class="watermark-opacity w-full" min="10" max="100" value="50">
+                            </div>
+                        </div>
+                    `;
+                    
+                    // 水印预览区域
+                    const watermarkPreview = document.createElement('div');
+                    watermarkPreview.className = 'watermark-preview-area hidden mt-3 p-2 border border-dashed border-gray-300 rounded-lg';
+                    
+                    // 预览图片
+                    const watermarkPreviewImg = document.createElement('img');
+                    watermarkPreviewImg.className = 'max-h-60 mx-auto';
+                    watermarkPreview.appendChild(watermarkPreviewImg);
+                    
+                    // 水印按钮组
+                    const watermarkActions = document.createElement('div');
+                    watermarkActions.className = 'flex mt-3';
+                    watermarkActions.innerHTML = `
+                        <button class="preview-watermark-btn bg-purple-500 hover:bg-purple-600 text-white px-4 py-2 rounded-l transition flex-1">
+                            应用水印预览
+                        </button>
+                        <a href="${data.url}/watermark?download=true" class="bg-green-500 hover:bg-green-600 text-white px-4 py-2 rounded-r transition flex-1 text-center">
+                            下载带水印版本
+                        </a>
+                    `;
+                    
+                    // 组装水印区域
+                    watermarkContainer.appendChild(watermarkControls);
+                    watermarkContainer.appendChild(watermarkPreview);
+                    watermarkContainer.appendChild(watermarkActions);
+                    
+                    // 添加所有元素到结果卡片
+                    resultCard.appendChild(imgPreview);
+                    resultCard.appendChild(fileInfo);
+                    resultCard.appendChild(linkGroup);
+                    resultCard.appendChild(watermarkContainer);
+                    
+                    // 添加结果卡片到结果区域
+                    resultArea.appendChild(resultCard);
+                    
+                    // 添加水印预览事件
+                    const previewBtn = resultCard.querySelector('.preview-watermark-btn');
+                    const textInput = resultCard.querySelector('.watermark-text');
+                    const positionSelect = resultCard.querySelector('.watermark-position');
+                    const opacityInput = resultCard.querySelector('.watermark-opacity');
+                    const previewArea = resultCard.querySelector('.watermark-preview-area');
+                    const previewImg = resultCard.querySelector('.watermark-preview-area img');
+                    
+                    // 预览水印事件
+                    previewBtn.addEventListener('click', function() {
+                        const text = textInput.value;
+                        const position = positionSelect.value;
+                        const opacity = opacityInput.value / 100;
+                        
+                        // 显示预览区域和加载状态
+                        previewArea.classList.remove('hidden');
+                        previewImg.src = '/static/loading.svg'; // 使用SVG加载动画
+                        
+                        // 构建水印URL
+                        const watermarkUrl = `${data.url}/watermark?text=${encodeURIComponent(text)}&position=${position}&opacity=${opacity}`;
+                        
+                        // 更新下载链接
+                        const downloadLink = resultCard.querySelector('a[href*="/watermark"]');
+                        downloadLink.href = `${watermarkUrl}&download=true`;
+                        
+                        // 加载预览图片
+                        previewImg.onload = function() {
+                            // 图片加载完成，可以添加动画效果
+                            previewImg.classList.add('loaded');
+                        };
+                        
+                        // 设置预览图片URL (使用时间戳防止缓存)
+                        previewImg.src = `${watermarkUrl}&t=${new Date().getTime()}`;
+                    });
+                });
+                
+                // 添加"再次上传"按钮
+                const uploadAgainBtn = document.createElement('button');
+                uploadAgainBtn.id = 'upload-another';
+                uploadAgainBtn.className = 'w-full py-3 mt-6 bg-blue-500 hover:bg-blue-600 text-white rounded-lg transition';
+                uploadAgainBtn.innerHTML = '<i class="fas fa-upload mr-2"></i> 再次上传';
+                uploadAgainBtn.addEventListener('click', function() {
+                    // 隐藏结果区域和预览区域
+                    resultArea.classList.add('hidden');
+                    previewArea.classList.add('hidden');
+                    // 显示上传区域
+                    dropArea.parentElement.classList.remove('hidden');
+                    // 清空文件
+                    selectedFiles = [];
+                    fileInput.value = '';
+                    // 隐藏上传按钮
+                    uploadAction.classList.add('hidden');
+                    // 隐藏状态消息
+                    statusMessage.classList.add('hidden');
+                });
+                
+                resultArea.appendChild(uploadAgainBtn);
+                
+                // 滚动到结果区域
+                resultArea.scrollIntoView({behavior: 'smooth'});
+            }
+            
+            // 创建链接输入框
+            function createLinkInput(label, value) {
+                const container = document.createElement('div');
+                container.className = 'flex flex-col';
+                
+                const labelEl = document.createElement('label');
+                labelEl.className = 'text-sm font-medium text-gray-600 mb-1';
+                labelEl.textContent = label;
+                
+                const inputGroup = document.createElement('div');
+                inputGroup.className = 'flex';
+                
+                const input = document.createElement('input');
+                input.type = 'text';
+                input.value = value;
+                input.readOnly = true;
+                input.className = 'border rounded-l px-3 py-2 w-full bg-gray-50 focus:outline-none';
+                
+                const copyBtn = document.createElement('button');
+                copyBtn.className = 'bg-blue-500 hover:bg-blue-600 text-white px-3 py-2 rounded-r';
+                copyBtn.textContent = '复制';
+                copyBtn.onclick = function() {
                     input.select();
                     document.execCommand('copy');
-                    
-                    // 显示复制成功提示
-                    const originalText = this.textContent;
-                    this.textContent = '已复制!';
-                    this.classList.remove('bg-blue-500', 'hover:bg-blue-600');
-                    this.classList.add('bg-green-500', 'hover:bg-green-600');
-                    
-                    // 恢复按钮原始状态
+                    copyBtn.textContent = '已复制!';
                     setTimeout(() => {
-                        this.textContent = originalText;
-                        this.classList.remove('bg-green-500', 'hover:bg-green-600');
-                        this.classList.add('bg-blue-500', 'hover:bg-blue-600');
+                        copyBtn.textContent = '复制';
                     }, 1500);
-                });
-            });
+                };
+                
+                inputGroup.appendChild(input);
+                inputGroup.appendChild(copyBtn);
+                
+                container.appendChild(labelEl);
+                container.appendChild(inputGroup);
+                
+                return container;
+            }
             
             // 显示状态消息
             function showStatus(message, type) {

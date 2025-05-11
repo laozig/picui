@@ -424,8 +424,12 @@
         
         <div class="card">
             <h2>快速访问</h2>
-            <a href="/admin/short-links" class="btn">短链管理</a>
-            <a href="/logs" class="btn">上传日志</a>
+            <a href="/admin/short-links" class="btn" target="_blank">短链管理</a>
+            <a href="/logs/" class="btn" target="_blank">上传日志</a>
+            <div class="help-text" style="margin-top: 15px; font-size: 14px; color: var(--text-color); opacity: 0.8;">
+                注意：点击上面的链接会在新标签页打开对应功能。<br>
+                短链管理可以查看和删除所有生成的短链接，上传日志可以查看所有图片上传记录。
+            </div>
         </div>
     </div>
     
@@ -581,32 +585,130 @@
                 return;
             }
             
+            // 显示调试信息
+            console.log('水印参数:', {
+                filename: window.uploadedFilename,
+                text: document.getElementById('watermark-text').value,
+                position: document.getElementById('watermark-position').value,
+                opacity: document.getElementById('watermark-opacity').value,
+                download: download
+            });
+            
             const text = document.getElementById('watermark-text').value;
             const position = document.getElementById('watermark-position').value;
             const opacity = document.getElementById('watermark-opacity').value;
             
+            // 显示加载状态
+            const previewArea = document.querySelector('.watermark-preview');
+            previewArea.style.display = 'block';
+            const previewImg = document.getElementById('watermark-preview-img');
+            previewImg.src = 'data:image/svg+xml;charset=utf-8,<svg xmlns="http://www.w3.org/2000/svg" width="40" height="40" viewBox="0 0 50 50"><path fill="%23cccccc" d="M25,5A20.14,20.14,0,0,1,45,22.88a2.51,2.51,0,0,0,2.49,2.26h0A2.52,2.52,0,0,0,50,22.33a25.14,25.14,0,0,0-50,0,2.52,2.52,0,0,0,2.5,2.81h0A2.51,2.51,0,0,0,5,22.88,20.14,20.14,0,0,1,25,5Z"><animateTransform attributeName="transform" type="rotate" from="0 25 25" to="360 25 25" dur="0.6s" repeatCount="indefinite"/></path></svg>';
+            
             // 构建水印URL
             const watermarkUrl = `/images/${window.uploadedFilename}/watermark?text=${encodeURIComponent(text)}&position=${position}&opacity=${opacity}${download ? '&download=true' : ''}`;
+            console.log('水印URL:', watermarkUrl);
             
             if (download) {
-                // 如果是下载，创建一个临时链接并点击它
-                const a = document.createElement('a');
-                a.href = watermarkUrl;
-                a.download = `watermark_${window.uploadedFilename}`;
-                document.body.appendChild(a);
-                a.click();
-                document.body.removeChild(a);
-            } else {
-                // 显示水印预览
-                const previewImg = document.getElementById('watermark-preview-img');
-                previewImg.src = watermarkUrl;
-                document.querySelector('.watermark-preview').style.display = 'block';
+                // 直接打开下载链接（更可靠的方法）
+                window.open(watermarkUrl, '_blank');
+                return;
                 
-                // 更新直接链接为水印图片链接
-                document.getElementById('direct-url').value = watermarkUrl;
-                document.getElementById('html-code').value = `<img src="${watermarkUrl}" alt="带水印的图片" />`;
-                document.getElementById('md-code').value = `![带水印的图片](${watermarkUrl})`;
+                /* 之前的下载方法，暂时注释掉
+                // 使用fetch API检查和处理下载请求
+                fetch(watermarkUrl)
+                    .then(response => {
+                        if (!response.ok) {
+                            throw new Error(`下载失败: ${response.status} ${response.statusText}`);
+                        }
+                        return response.blob();
+                    })
+                    .then(blob => {
+                        // 创建下载链接
+                        const url = window.URL.createObjectURL(blob);
+                        const a = document.createElement('a');
+                        a.href = url;
+                        a.download = `watermark_${window.uploadedFilename}`;
+                        document.body.appendChild(a);
+                        a.click();
+                        window.URL.revokeObjectURL(url);
+                        document.body.removeChild(a);
+                        
+                        showMessage('水印图片下载成功！', 'success');
+                    })
+                    .catch(error => {
+                        showError(`下载水印图片失败: ${error.message}`);
+                        console.error('下载错误:', error);
+                    });
+                */
+            } else {
+                // 直接设置图片源，先尝试这种简单方法
+                previewImg.onerror = function() {
+                    showError('加载水印预览失败。请检查服务器日志。');
+                    console.error('预览加载失败:', watermarkUrl);
+                    // 隐藏预览区域
+                    previewArea.style.display = 'none';
+                };
+                
+                previewImg.onload = function() {
+                    showMessage('水印预览加载成功', 'success');
+                    // 更新直接链接为水印图片链接
+                    document.getElementById('direct-url').value = watermarkUrl;
+                    document.getElementById('html-code').value = `<img src="${watermarkUrl}" alt="带水印的图片" />`;
+                    document.getElementById('md-code').value = `![带水印的图片](${watermarkUrl})`;
+                };
+                
+                // 设置图片源
+                previewImg.src = watermarkUrl;
+                previewArea.style.display = 'block';
+                
+                /* 之前的方法，暂时注释掉
+                // 使用fetch API先检查水印图片是否可以访问
+                fetch(watermarkUrl)
+                    .then(response => {
+                        if (!response.ok) {
+                            throw new Error(`预览失败: ${response.status} ${response.statusText}`);
+                        }
+                        
+                        // 显示水印预览
+                        previewImg.src = watermarkUrl;
+                        previewArea.style.display = 'block';
+                        
+                        // 更新直接链接为水印图片链接
+                        document.getElementById('direct-url').value = watermarkUrl;
+                        document.getElementById('html-code').value = `<img src="${watermarkUrl}" alt="带水印的图片" />`;
+                        document.getElementById('md-code').value = `![带水印的图片](${watermarkUrl})`;
+                    })
+                    .catch(error => {
+                        showError(`加载水印预览失败: ${error.message}`);
+                        console.error('预览错误:', error);
+                        previewArea.style.display = 'none';
+                    });
+                */
             }
+        }
+        
+        // 显示成功消息
+        function showMessage(message, type = 'info') {
+            const messageDiv = document.createElement('div');
+            messageDiv.className = `message ${type}`;
+            messageDiv.textContent = message;
+            messageDiv.style.padding = '10px';
+            messageDiv.style.margin = '10px 0';
+            messageDiv.style.borderRadius = '4px';
+            messageDiv.style.backgroundColor = type === 'success' ? '#d4edda' : '#cce5ff';
+            messageDiv.style.color = type === 'success' ? '#155724' : '#004085';
+            messageDiv.style.border = `1px solid ${type === 'success' ? '#c3e6cb' : '#b8daff'}`;
+            
+            // 插入到结果区域的顶部
+            const resultDiv = document.getElementById('result');
+            resultDiv.insertBefore(messageDiv, resultDiv.firstChild);
+            
+            // 5秒后自动消失
+            setTimeout(() => {
+                messageDiv.style.opacity = '0';
+                messageDiv.style.transition = 'opacity 0.5s ease';
+                setTimeout(() => messageDiv.remove(), 500);
+            }, 5000);
         }
     </script>
 </body>
