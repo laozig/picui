@@ -191,7 +191,7 @@
                     <input id="file-input" type="file" accept="image/*" class="hidden" />
                 </label>
                 <div class="text-sm text-gray-500 mt-5">
-                    <p class="text-base">支持多种图片格式 (最大 <span id="max-size" class="font-semibold text-blue-600">20MB</span>)</p>
+                    <p class="text-base">支持多种图片格式 (最大 <span id="max-size" class="font-semibold text-blue-600">15MB</span>)</p>
                     <div id="format-list" class="mt-3 flex flex-wrap justify-center">
                         <span class="format-badge pulse-animation">加载中...</span>
                     </div>
@@ -199,6 +199,18 @@
             </div>
         </div>
         
+        <!-- Token 输入框 -->
+        <div class="mb-6">
+            <div class="max-w-md mx-auto">
+                <label for="token-input" class="block text-sm font-medium text-gray-700 mb-2 flex items-center">
+                    <svg xmlns="http://www.w3.org/2000/svg" class="h-4 w-4 mr-1" fill="none" viewBox="0 0 24 24" stroke="currentColor">
+                        <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M12 15v2m-6 4h12a2 2 0 002-2v-6a2 2 0 00-2-2H6a2 2 0 00-2 2v6a2 2 0 002 2zm10-10V7a4 4 0 00-8 0v4h8z" />
+                    </svg>
+                    访问令牌
+                </label>
+                <input id="token-input" type="password" class="w-full p-3 border rounded-lg focus:outline-none focus:ring-2 focus:ring-blue-500" placeholder="请输入访问令牌" />
+            </div>
+        </div>
         <!-- 上传按钮 -->
         <div class="text-center mb-8">
             <button id="upload-button" class="bg-gradient-to-r from-green-500 to-emerald-600 text-white px-10 py-3 rounded-lg transition-colors btn font-semibold text-lg disabled:opacity-50 disabled:cursor-not-allowed shadow-md" disabled>
@@ -306,6 +318,7 @@
             // 获取DOM元素
             const dropArea = document.getElementById('drop-area');
             const fileInput = document.getElementById('file-input');
+            const tokenInput = document.getElementById('token-input');
             const uploadButton = document.getElementById('upload-button');
             const resultArea = document.getElementById('result-area');
             const imagePreview = document.getElementById('image-preview');
@@ -327,7 +340,7 @@
             
             // 支持的格式和最大文件大小
             let supportedFormats = [];
-            let maxFileSizeMB = 20;
+            let maxFileSizeMB = 15;
             
             // 获取支持的格式
             fetch('/supported-formats')
@@ -424,13 +437,26 @@
                 // 保存文件引用
                 selectedFile = file;
                 
-                // 启用上传按钮
-                uploadButton.removeAttribute('disabled');
-                uploadButton.classList.add('pulse-animation');
+                // 启用上传按钮（只有当token也有值时）
+                checkEnableUploadButton();
                 
                 // 显示文件名
                 showStatus(`已选择: ${file.name}`, 'info');
             }
+            
+            // 检查是否启用上传按钮
+            function checkEnableUploadButton() {
+                if (selectedFile && tokenInput.value.trim() !== '') {
+                    uploadButton.removeAttribute('disabled');
+                    uploadButton.classList.add('pulse-animation');
+                } else {
+                    uploadButton.setAttribute('disabled', 'true');
+                    uploadButton.classList.remove('pulse-animation');
+                }
+            }
+            
+            // 监听token输入框变化
+            tokenInput.addEventListener('input', checkEnableUploadButton);
             
             // 上传按钮点击事件
             uploadButton.addEventListener('click', uploadFile);
@@ -451,11 +477,12 @@
             });
             
             function uploadFile() {
-                if (!selectedFile) return;
+                if (!selectedFile || tokenInput.value.trim() === '') return;
                 
                 // 创建FormData
                 const formData = new FormData();
                 formData.append('file', selectedFile);
+                formData.append('token', tokenInput.value.trim());
                 
                 // 显示上传中状态
                 uploadButton.textContent = '上传中...';
@@ -482,7 +509,7 @@
                     
                     // 重置上传按钮
                     uploadButton.textContent = '上传图片';
-                    uploadButton.removeAttribute('disabled');
+                    checkEnableUploadButton();
                     
                     // 显示结果区域
                     resultArea.classList.remove('hidden');

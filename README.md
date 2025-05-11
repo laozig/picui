@@ -15,21 +15,24 @@
 
 - 🎨 精美现代的用户界面，支持拖拽上传
 - 🖼️ 支持16种常见图片格式，包括JPG、PNG、GIF、WEBP等
-- 📦 最大支持20MB图片上传
+- 📦 最大支持15MB图片上传
 - 🔗 一键复制图片链接、HTML和Markdown代码
 - 🗄️ SQLite数据库存储图片元数据
 - 📱 响应式设计，完美适配各种设备
 - 🚀 支持Docker容器化部署
 - ☁️ 支持Railway、Render等云平台部署
 - 📝 完整的中文API文档
+- 🛡️ 内置频率限制，防止滥用
+- 🔐 Token验证机制，确保安全上传
+- 🚦 并发控制，防止DDoS攻击
 
 ## 预览
 
 ### 上传界面
 ![上传界面](./1.png)
 
-### 上传成功界面
-![上传成功界面](./2.png)
+### API界面
+![API界面](./2.png)
 
 ## 快速开始
 
@@ -73,6 +76,7 @@ python main.py
 
 1. 通过网页界面上传:
    - 点击"选择图片"或者将图片拖拽到上传区域
+   - 输入访问令牌（默认为"mysecrettoken"）
    - 点击"上传图片"按钮
    - 上传完成后可获取图片链接、HTML和Markdown代码
    - 可以点击"在新窗口打开"查看原图
@@ -80,7 +84,7 @@ python main.py
 
 2. 通过API上传:
    - 发送POST请求到 `/upload` 端点
-   - 请求体使用 `multipart/form-data` 格式，包含 `file` 字段
+   - 请求体使用 `multipart/form-data` 格式，包含 `file` 和 `token` 字段
    - 返回JSON包含图片URL和ID
 
 ### 支持的图片格式
@@ -147,8 +151,12 @@ PicUI支持以下环境变量配置：
 - `HOST`: 应用监听地址（默认: 0.0.0.0）
 - `BASE_URL`: 应用基础URL（默认: http://localhost:PORT）
 - `UPLOAD_DIR`: 上传文件存储目录（默认: uploads）
-- `MAX_FILE_SIZE`: 最大文件大小（字节，默认: 20MB）
+- `MAX_FILE_SIZE`: 最大文件大小（字节，默认: 15MB）
 - `DATABASE_URL`: 数据库URL（默认: sqlite:///./picui.db）
+- `RATE_LIMIT`: 每分钟最大上传请求数（默认: 20）
+- `RATE_LIMIT_WINDOW`: 频率限制时间窗口，单位秒（默认: 60）
+- `API_TOKEN`: 上传接口访问令牌（默认: mysecrettoken）
+- `MAX_CONCURRENT_UPLOADS`: 最大并发上传数（默认: 20）
 
 ## 贡献指南
 
