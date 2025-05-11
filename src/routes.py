@@ -405,12 +405,17 @@ async def access_short_link(code: str, db: Session = Depends(get_db)):
     if short_link.is_expired():
         raise HTTPException(status_code=410, detail="短链接已过期")
     
-    # 增加访问计数
-    short_link.increase_access_count()
-    db.commit()
-    
-    # 重定向到原始图片
-    return RedirectResponse(url=f"/images/{short_link.target_file}")
+    try:
+        # 增加访问计数
+        short_link.increase_access_count()
+        db.commit()
+        
+        # 重定向到原始图片
+        return RedirectResponse(url=f"/images/{short_link.target_file}")
+    except Exception as e:
+        db.rollback()
+        logger.error(f"短链接访问失败: {str(e)}")
+        raise HTTPException(status_code=500, detail=f"访问短链接时发生错误: {str(e)}")
 
 # 图片查看路由
 @router.get("/images/{filename}", tags=["图片"], summary="查看图片", description="访问上传的图片")
@@ -424,11 +429,12 @@ async def view_image(filename: str, db: Session = Depends(get_db)):
     img_info = db.query(Image).filter(Image.filename == filename).first()
     content_type = img_info.mime_type if img_info else "image/jpeg"
     
-    # 返回图片文件
+    # 返回图片文件，设置内容处理方式为inline以便在浏览器中查看而不是下载
     return FileResponse(
         file_path, 
         media_type=content_type,
-        filename=img_info.original_filename if img_info else filename
+        filename=img_info.original_filename if img_info else filename,
+        content_disposition_type="inline"  # 添加此参数确保在浏览器中预览
     )
 
 # 获取带水印的图片 - 使用线程池处理CPU密集型操作

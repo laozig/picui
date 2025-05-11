@@ -267,6 +267,64 @@
                 margin-top: 10px;
             }
         }
+        
+        .watermark-options {
+            margin-top: 20px;
+            padding: 15px;
+            border: 1px solid var(--border-color);
+            border-radius: 5px;
+            background-color: var(--card-bg);
+        }
+        
+        .watermark-fields {
+            display: flex;
+            flex-wrap: wrap;
+            gap: 10px;
+            margin-bottom: 15px;
+        }
+        
+        .field-group {
+            display: flex;
+            flex-direction: column;
+            flex: 1;
+            min-width: 150px;
+        }
+        
+        .watermark-input {
+            padding: 8px;
+            border: 1px solid var(--border-color);
+            border-radius: 4px;
+            background-color: var(--input-bg);
+            color: var(--text-color);
+        }
+        
+        .watermark-slider {
+            margin-top: 5px;
+            width: 100%;
+        }
+        
+        .watermark-buttons {
+            display: flex;
+            gap: 10px;
+            margin-bottom: 15px;
+        }
+        
+        .btn-watermark {
+            flex: 1;
+        }
+        
+        .watermark-preview {
+            margin-top: 15px;
+            text-align: center;
+            display: none;
+        }
+        
+        .watermark-img {
+            max-width: 100%;
+            max-height: 300px;
+            border: 1px solid var(--border-color);
+            border-radius: 4px;
+        }
     </style>
 </head>
 <body>
@@ -325,6 +383,39 @@
                 <div class="url-group">
                     <span class="url-label">Markdown代码：</span>
                     <input type="text" id="md-code" class="url-input" readonly>
+                </div>
+                
+                <!-- 水印设置区域 -->
+                <div class="watermark-options">
+                    <h4>添加水印</h4>
+                    <div class="watermark-fields">
+                        <div class="field-group">
+                            <label for="watermark-text">水印文字:</label>
+                            <input type="text" id="watermark-text" value="PicUI图床" class="watermark-input">
+                        </div>
+                        <div class="field-group">
+                            <label for="watermark-position">位置:</label>
+                            <select id="watermark-position" class="watermark-input">
+                                <option value="bottom-right">右下角</option>
+                                <option value="bottom-left">左下角</option>
+                                <option value="top-right">右上角</option>
+                                <option value="top-left">左上角</option>
+                                <option value="center">中心</option>
+                            </select>
+                        </div>
+                        <div class="field-group">
+                            <label for="watermark-opacity">不透明度:</label>
+                            <input type="range" id="watermark-opacity" min="0.1" max="1.0" step="0.1" value="0.5" class="watermark-slider">
+                            <span id="opacity-value">0.5</span>
+                        </div>
+                    </div>
+                    <div class="watermark-buttons">
+                        <button class="btn btn-watermark" id="apply-watermark">应用水印</button>
+                        <button class="btn btn-watermark" id="download-watermark">下载水印图片</button>
+                    </div>
+                    <div class="watermark-preview">
+                        <img id="watermark-preview-img" class="watermark-img" src="" alt="水印预览">
+                    </div>
                 </div>
                 
                 <button class="btn" onclick="resetUpload()">上传另一张</button>
@@ -420,12 +511,18 @@
                 return response.json();
             })
             .then(data => {
+                // 保存上传的文件名，用于水印功能
+                window.uploadedFilename = data.filename;
+                
                 // 显示结果
                 document.getElementById('preview-img').src = data.url;
                 document.getElementById('direct-url').value = data.url;
                 document.getElementById('short-url').value = data.short_url;
                 document.getElementById('html-code').value = data.html_code;
                 document.getElementById('md-code').value = data.markdown_code;
+                
+                // 重置水印预览
+                document.querySelector('.watermark-preview').style.display = 'none';
                 
                 dragArea.style.display = 'none';
                 resultDiv.style.display = 'block';
@@ -459,6 +556,58 @@
                 }
             });
         });
+        
+        // 水印功能
+        document.addEventListener('DOMContentLoaded', () => {
+            // 监听不透明度滑块变化
+            const opacitySlider = document.getElementById('watermark-opacity');
+            const opacityValue = document.getElementById('opacity-value');
+            
+            opacitySlider.addEventListener('input', () => {
+                opacityValue.textContent = opacitySlider.value;
+            });
+            
+            // 应用水印按钮点击事件
+            document.getElementById('apply-watermark').addEventListener('click', applyWatermark);
+            
+            // 下载水印图片按钮点击事件
+            document.getElementById('download-watermark').addEventListener('click', () => applyWatermark(true));
+        });
+        
+        // 应用水印函数
+        function applyWatermark(download = false) {
+            if (!window.uploadedFilename) {
+                showError('没有找到已上传的图片');
+                return;
+            }
+            
+            const text = document.getElementById('watermark-text').value;
+            const position = document.getElementById('watermark-position').value;
+            const opacity = document.getElementById('watermark-opacity').value;
+            
+            // 构建水印URL
+            const watermarkUrl = `/images/${window.uploadedFilename}/watermark?text=${encodeURIComponent(text)}&position=${position}&opacity=${opacity}${download ? '&download=true' : ''}`;
+            
+            if (download) {
+                // 如果是下载，创建一个临时链接并点击它
+                const a = document.createElement('a');
+                a.href = watermarkUrl;
+                a.download = `watermark_${window.uploadedFilename}`;
+                document.body.appendChild(a);
+                a.click();
+                document.body.removeChild(a);
+            } else {
+                // 显示水印预览
+                const previewImg = document.getElementById('watermark-preview-img');
+                previewImg.src = watermarkUrl;
+                document.querySelector('.watermark-preview').style.display = 'block';
+                
+                // 更新直接链接为水印图片链接
+                document.getElementById('direct-url').value = watermarkUrl;
+                document.getElementById('html-code').value = `<img src="${watermarkUrl}" alt="带水印的图片" />`;
+                document.getElementById('md-code').value = `![带水印的图片](${watermarkUrl})`;
+            }
+        }
     </script>
 </body>
 </html> 

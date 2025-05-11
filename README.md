@@ -114,7 +114,19 @@ print(response.json())
 
 ## 水印功能
 
-PicUI支持为图片添加文字水印:
+PicUI支持为图片添加文字水印。有两种方式使用水印功能：
+
+### 1. 通过上传界面添加水印（推荐）
+
+在图片上传成功后，您可以在结果页面看到"添加水印"选项。您可以：
+
+1. 自定义水印文字
+2. 选择水印位置（右下角、左下角、右上角、左上角或中心）
+3. 调整水印不透明度
+4. 点击"应用水印"按钮预览带水印的图片
+5. 点击"下载水印图片"按钮直接下载带水印的图片
+
+### 2. 通过API地址直接调用
 
 ```
 /images/{filename}/watermark?text=水印文字&position=bottom-right&opacity=0.5
@@ -125,6 +137,11 @@ PicUI支持为图片添加文字水印:
 - `position`: 位置(center/bottom-right/bottom-left/top-right/top-left)
 - `opacity`: 不透明度(0.1-1.0)
 - `download`: 是否下载(true/false)
+
+示例：为图片添加居中显示的半透明水印
+```
+/images/e12a45b7-890c-4d2f-a3b5-6c78d9e0f123.jpg/watermark?text=版权所有&position=center&opacity=0.5
+```
 
 ## 多线程与异步
 
@@ -165,3 +182,59 @@ docker run -d -p 8000:8000 -v ./uploads:/app/uploads --name picui picui:latest
 ## 许可证
 
 MIT
+
+## 页面访问地址
+
+| 页面名称 | 访问地址 | 说明 |
+|---------|---------|------|
+| 主页 | `/` | 上传图片的主界面 |
+| 管理面板 | `/admin` | 图片管理和系统设置 |
+| 短链接管理 | `/admin/short-links` | 管理所有短链接 |
+| 上传日志 | `/logs/` | 查看所有上传记录 |
+
+## 未使用的模板文件
+
+以下模板文件暂未使用，可以考虑删除：
+
+- `dashboard.html` - 没有对应的路由
+- `simple.html` - 没有对应的路由
+
+## API接口
+
+### 图片上传
+
+```
+POST /upload
+```
+
+### 图片查看
+
+```
+GET /images/{filename}
+```
+
+### 短链接访问
+
+```
+GET /s/{code}
+```
+
+### 水印图片
+
+```
+GET /images/{filename}/watermark?text=水印文字&position=bottom-right
+```
+
+## 环境变量
+
+- `PORT` - 服务端口，默认8000
+- `HOST` - 监听地址，默认0.0.0.0
+- `UPLOAD_DIR` - 上传目录，默认uploads
+- `MAX_FILE_SIZE` - 最大文件大小(字节)，默认15MB
+- `BASE_URL` - 基础URL，用于生成图片访问链接
+
+## 使用方法
+
+1. 打开浏览器访问 `http://localhost:8000/`
+2. 上传图片，获取图片链接
+3. 通过 `/admin` 管理已上传的图片
