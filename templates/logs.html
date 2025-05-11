@@ -1,0 +1,163 @@
+<!DOCTYPE html>
+<html lang="zh-CN">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>上传日志 - PicUI图床</title>
+    <link href="https://cdn.bootcdn.net/ajax/libs/tailwindcss/2.2.19/tailwind.min.css" rel="stylesheet">
+    <link rel="stylesheet" href="https://cdn.bootcdn.net/ajax/libs/font-awesome/5.15.4/css/all.min.css">
+    <style>
+        .pagination a {
+            display: inline-block;
+            padding: 0.5rem 1rem;
+            margin: 0 0.25rem;
+            border-radius: 0.25rem;
+        }
+
+        .pagination a.active {
+            background-color: #4F46E5;
+            color: white;
+        }
+
+        .pagination a:hover:not(.active) {
+            background-color: #E5E7EB;
+        }
+    </style>
+</head>
+<body class="bg-gray-100 min-h-screen">
+    <div class="container mx-auto px-4 py-8">
+        <div class="flex justify-between items-center mb-6">
+            <h1 class="text-2xl font-bold text-gray-800">上传日志（近7天）</h1>
+            <div>
+                <a href="/admin" class="bg-gray-600 hover:bg-gray-700 text-white font-bold py-2 px-4 rounded">
+                    <i class="fas fa-arrow-left mr-2"></i>返回管理面板
+                </a>
+            </div>
+        </div>
+
+        <div class="bg-white shadow-md rounded-lg overflow-hidden">
+            <div class="overflow-x-auto">
+                <table class="min-w-full divide-y divide-gray-200">
+                    <thead class="bg-gray-50">
+                        <tr>
+                            <th scope="col" class="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">文件名</th>
+                            <th scope="col" class="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">原始文件名</th>
+                            <th scope="col" class="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">大小</th>
+                            <th scope="col" class="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">类型</th>
+                            <th scope="col" class="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">IP地址</th>
+                            <th scope="col" class="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">状态</th>
+                            <th scope="col" class="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">上传时间</th>
+                            <th scope="col" class="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">用户</th>
+                        </tr>
+                    </thead>
+                    <tbody class="bg-white divide-y divide-gray-200">
+                        {% for log in logs %}
+                        <tr class="hover:bg-gray-50">
+                            <td class="px-6 py-4 whitespace-nowrap text-sm text-gray-500">
+                                {% if log.filename %}
+                                <a href="/img/{{ log.filename }}" target="_blank" class="text-blue-500 hover:text-blue-700">{{ log.filename }}</a>
+                                {% else %}
+                                <span class="text-gray-400">-</span>
+                                {% endif %}
+                            </td>
+                            <td class="px-6 py-4 whitespace-nowrap text-sm text-gray-500">{{ log.original_filename }}</td>
+                            <td class="px-6 py-4 whitespace-nowrap text-sm text-gray-500">
+                                {% if log.size %}
+                                {{ "%.2f"|format(log.size) }} KB
+                                {% else %}
+                                <span class="text-gray-400">-</span>
+                                {% endif %}
+                            </td>
+                            <td class="px-6 py-4 whitespace-nowrap text-sm text-gray-500">{{ log.mime_type or '-' }}</td>
+                            <td class="px-6 py-4 whitespace-nowrap text-sm text-gray-500">{{ log.ip_address or '-' }}</td>
+                            <td class="px-6 py-4 whitespace-nowrap text-sm">
+                                {% if log.status == 'success' %}
+                                <span class="px-2 inline-flex text-xs leading-5 font-semibold rounded-full bg-green-100 text-green-800">成功</span>
+                                {% elif log.status == 'failed' %}
+                                <span class="px-2 inline-flex text-xs leading-5 font-semibold rounded-full bg-red-100 text-red-800" title="{{ log.error_message }}">失败</span>
+                                {% elif log.status == 'deleted' %}
+                                <span class="px-2 inline-flex text-xs leading-5 font-semibold rounded-full bg-yellow-100 text-yellow-800">已删除</span>
+                                {% else %}
+                                <span class="px-2 inline-flex text-xs leading-5 font-semibold rounded-full bg-gray-100 text-gray-800">{{ log.status }}</span>
+                                {% endif %}
+                            </td>
+                            <td class="px-6 py-4 whitespace-nowrap text-sm text-gray-500">{{ log.upload_time.strftime('%Y-%m-%d %H:%M:%S') }}</td>
+                            <td class="px-6 py-4 whitespace-nowrap text-sm text-gray-500">
+                                {% if log.user %}
+                                {{ log.user.username }}
+                                {% else %}
+                                <span class="text-gray-400">匿名</span>
+                                {% endif %}
+                            </td>
+                        </tr>
+                        {% endfor %}
+                    </tbody>
+                </table>
+            </div>
+        </div>
+
+        <!-- 分页控件 -->
+        <div class="mt-6 flex justify-between items-center">
+            <div class="text-sm text-gray-700">
+                共 <span class="font-medium">{{ total_logs }}</span> 条记录，
+                当前第 <span class="font-medium">{{ page }}</span> 页，
+                共 <span class="font-medium">{{ total_pages }}</span> 页
+            </div>
+            <div class="pagination">
+                {% if page > 1 %}
+                <a href="/logs?page=1" class="bg-white border border-gray-300 text-gray-500 hover:bg-gray-50">
+                    <i class="fas fa-angle-double-left"></i>
+                </a>
+                <a href="/logs?page={{ page - 1 }}" class="bg-white border border-gray-300 text-gray-500 hover:bg-gray-50">
+                    <i class="fas fa-angle-left"></i>
+                </a>
+                {% endif %}
+
+                {% for p in range(max(1, page - 2), min(total_pages + 1, page + 3)) %}
+                <a href="/logs?page={{ p }}" class="bg-white border border-gray-300 text-gray-500 hover:bg-gray-50 {% if p == page %}active{% endif %}">
+                    {{ p }}
+                </a>
+                {% endfor %}
+
+                {% if page < total_pages %}
+                <a href="/logs?page={{ page + 1 }}" class="bg-white border border-gray-300 text-gray-500 hover:bg-gray-50">
+                    <i class="fas fa-angle-right"></i>
+                </a>
+                <a href="/logs?page={{ total_pages }}" class="bg-white border border-gray-300 text-gray-500 hover:bg-gray-50">
+                    <i class="fas fa-angle-double-right"></i>
+                </a>
+                {% endif %}
+            </div>
+        </div>
+    </div>
+
+    <script>
+        // 显示错误消息的悬浮提示
+        document.addEventListener('DOMContentLoaded', function() {
+            const failedStatuses = document.querySelectorAll('.bg-red-100');
+            failedStatuses.forEach(function(element) {
+                const errorMessage = element.getAttribute('title');
+                if (errorMessage) {
+                    element.addEventListener('mouseover', function(e) {
+                        const tooltip = document.createElement('div');
+                        tooltip.className = 'bg-black text-white text-xs rounded py-1 px-2 absolute z-10';
+                        tooltip.style.maxWidth = '250px';
+                        tooltip.textContent = errorMessage;
+                        tooltip.style.top = (e.pageY + 10) + 'px';
+                        tooltip.style.left = (e.pageX + 10) + 'px';
+                        tooltip.id = 'error-tooltip';
+                        document.body.appendChild(tooltip);
+                    });
+                    
+                    element.addEventListener('mouseout', function() {
+                        const tooltip = document.getElementById('error-tooltip');
+                        if (tooltip) {
+                            tooltip.remove();
+                        }
+                    });
+                }
+            });
+        });
+    </script>
+</body>
+</html> 

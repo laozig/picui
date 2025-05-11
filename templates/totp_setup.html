@@ -1,0 +1,314 @@
+<!DOCTYPE html>
+<html lang="zh-CN">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>PicUI - 两步验证设置</title>
+    <link rel="icon" href="data:image/svg+xml,<svg xmlns=%22http://www.w3.org/2000/svg%22 viewBox=%220 0 100 100%22><text y=%22.9em%22 font-size=%2290%22>🖼️</text></svg>">
+    <!-- 引入TailwindCSS -->
+    <script src="https://cdn.tailwindcss.com"></script>
+    <style>
+        @import url('https://fonts.googleapis.com/css2?family=Nunito:wght@400;500;600;700&display=swap');
+        
+        body {
+            font-family: 'Nunito', system-ui, sans-serif;
+            background-color: #f9fafb;
+            background-image: 
+                radial-gradient(circle at 25px 25px, #e5e7eb 2px, transparent 0),
+                radial-gradient(circle at 75px 75px, #e5e7eb 2px, transparent 0);
+            background-size: 100px 100px;
+        }
+        
+        .container {
+            max-width: 800px;
+            box-shadow: 0 10px 30px rgba(0, 0, 0, 0.08);
+            border: 1px solid rgba(0, 0, 0, 0.05);
+            backdrop-filter: blur(10px);
+            background-color: rgba(255, 255, 255, 0.95);
+        }
+        
+        .btn {
+            transition: all 0.3s ease;
+            position: relative;
+            overflow: hidden;
+        }
+        
+        .btn:hover {
+            transform: translateY(-2px);
+            box-shadow: 0 4px 12px rgba(0, 0, 0, 0.1);
+        }
+        
+        .logo-text {
+            background: linear-gradient(135deg, #3b82f6 0%, #2563eb 100%);
+            -webkit-background-clip: text;
+            -webkit-text-fill-color: transparent;
+        }
+        
+        .success-message {
+            animation: fadeIn 1s;
+        }
+        
+        .error-message {
+            animation: shake 0.5s;
+        }
+        
+        @keyframes fadeIn {
+            from { opacity: 0; }
+            to { opacity: 1; }
+        }
+        
+        @keyframes shake {
+            0%, 100% { transform: translateX(0); }
+            10%, 30%, 50%, 70%, 90% { transform: translateX(-5px); }
+            20%, 40%, 60%, 80% { transform: translateX(5px); }
+        }
+        
+        .qr-container {
+            max-width: 230px;
+            margin: 0 auto;
+        }
+        
+        .secret-key {
+            font-family: monospace;
+            letter-spacing: 2px;
+            background-color: #f3f4f6;
+            padding: 0.5rem 1rem;
+            border-radius: 0.25rem;
+            font-size: 1.1rem;
+            position: relative;
+        }
+        
+        .copy-btn {
+            position: absolute;
+            top: 0.5rem;
+            right: 0.5rem;
+        }
+    </style>
+</head>
+<body class="min-h-screen py-10">
+    <div class="container mx-auto p-8 rounded-3xl">
+        <div class="flex items-center justify-between mb-6">
+            <div class="flex items-center">
+                <div class="bg-blue-500 text-white p-3 rounded-xl mr-3 shadow-lg">
+                    <svg xmlns="http://www.w3.org/2000/svg" class="h-8 w-8" fill="none" viewBox="0 0 24 24" stroke="currentColor">
+                        <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M12 15v2m-6 4h12a2 2 0 002-2v-6a2 2 0 00-2-2H6a2 2 0 00-2 2v6a2 2 0 002 2zm10-10V7a4 4 0 00-8 0v4h8z" />
+                    </svg>
+                </div>
+                <h1 class="text-3xl font-bold">
+                    <span class="logo-text">PicUI</span>
+                    <span class="text-gray-700">两步验证设置</span>
+                </h1>
+            </div>
+            <div class="flex space-x-2">
+                <a href="/dashboard" class="bg-blue-100 hover:bg-blue-200 text-blue-700 px-4 py-2 rounded-lg transition-colors btn flex items-center">
+                    <svg xmlns="http://www.w3.org/2000/svg" class="h-4 w-4 mr-1" fill="none" viewBox="0 0 24 24" stroke="currentColor">
+                        <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M3 12l2-2m0 0l7-7 7 7M5 10v10a1 1 0 001 1h3m10-11l2 2m-2-2v10a1 1 0 01-1 1h-3m-6 0a1 1 0 001-1v-4a1 1 0 011-1h2a1 1 0 011 1v4a1 1 0 001 1m-6 0h6" />
+                    </svg>
+                    仪表板
+                </a>
+            </div>
+        </div>
+        
+        <!-- 成功提示 -->
+        {% if request.query_params.get('success') %}
+        <div class="bg-green-100 border-l-4 border-green-500 p-4 mb-6 success-message">
+            <div class="flex">
+                <div class="flex-shrink-0">
+                    <svg class="h-5 w-5 text-green-400" xmlns="http://www.w3.org/2000/svg" viewBox="0 0 20 20" fill="currentColor">
+                        <path fill-rule="evenodd" d="M10 18a8 8 0 100-16 8 8 0 000 16zm3.707-9.293a1 1 0 00-1.414-1.414L9 10.586 7.707 9.293a1 1 0 00-1.414 1.414l2 2a1 1 0 001.414 0l4-4z" clip-rule="evenodd" />
+                    </svg>
+                </div>
+                <div class="ml-3">
+                    <p class="text-sm text-green-700">
+                        <strong>两步验证已成功启用！</strong><br>
+                        您现在可以使用身份验证器应用进行登录验证。
+                    </p>
+                </div>
+            </div>
+        </div>
+        {% endif %}
+        
+        <!-- 禁用提示 -->
+        {% if request.query_params.get('disabled') %}
+        <div class="bg-yellow-100 border-l-4 border-yellow-500 p-4 mb-6 success-message">
+            <div class="flex">
+                <div class="flex-shrink-0">
+                    <svg class="h-5 w-5 text-yellow-400" xmlns="http://www.w3.org/2000/svg" viewBox="0 0 20 20" fill="currentColor">
+                        <path fill-rule="evenodd" d="M8.257 3.099c.765-1.36 2.722-1.36 3.486 0l5.58 9.92c.75 1.334-.213 2.98-1.742 2.98H4.42c-1.53 0-2.493-1.646-1.743-2.98l5.58-9.92zM11 13a1 1 0 11-2 0 1 1 0 012 0zm-1-8a1 1 0 00-1 1v3a1 1 0 002 0V6a1 1 0 00-1-1z" clip-rule="evenodd" />
+                    </svg>
+                </div>
+                <div class="ml-3">
+                    <p class="text-sm text-yellow-700">
+                        <strong>两步验证已禁用！</strong><br>
+                        您的账户安全性降低，建议重新启用两步验证以增强安全性。
+                    </p>
+                </div>
+            </div>
+        </div>
+        {% endif %}
+        
+        <!-- 当前状态 -->
+        <div class="bg-white rounded-xl p-6 shadow-md mb-8">
+            <h2 class="text-xl font-semibold mb-4 text-gray-700">两步验证状态</h2>
+            
+            {% if totp_enabled %}
+            <div class="flex items-center bg-green-50 p-4 rounded-lg">
+                <div class="bg-green-100 p-2 rounded-full mr-4">
+                    <svg class="h-6 w-6 text-green-600" xmlns="http://www.w3.org/2000/svg" fill="none" viewBox="0 0 24 24" stroke="currentColor">
+                        <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M5 13l4 4L19 7" />
+                    </svg>
+                </div>
+                <div>
+                    <p class="text-green-800 font-semibold">两步验证已启用</p>
+                    <p class="text-green-700 text-sm mt-1">您的账户受到额外的安全保护</p>
+                </div>
+            </div>
+            {% else %}
+            <div class="flex items-center bg-gray-50 p-4 rounded-lg">
+                <div class="bg-gray-100 p-2 rounded-full mr-4">
+                    <svg class="h-6 w-6 text-gray-600" xmlns="http://www.w3.org/2000/svg" fill="none" viewBox="0 0 24 24" stroke="currentColor">
+                        <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M12 15v2m-6 4h12a2 2 0 002-2v-6a2 2 0 00-2-2H6a2 2 0 00-2 2v6a2 2 0 002 2zm10-10V7a4 4 0 00-8 0v4h8z" />
+                    </svg>
+                </div>
+                <div>
+                    <p class="text-gray-800 font-semibold">两步验证未启用</p>
+                    <p class="text-gray-700 text-sm mt-1">建议启用以提高账户安全性</p>
+                </div>
+            </div>
+            {% endif %}
+        </div>
+        
+        <!-- 设置面板 -->
+        <div class="bg-white rounded-xl p-6 shadow-md mb-8">
+            {% if totp_enabled %}
+            <!-- 禁用两步验证 -->
+            <h2 class="text-xl font-semibold mb-4 text-gray-700">禁用两步验证</h2>
+            <div class="mb-6">
+                <p class="text-gray-600 mb-4">
+                    如果您需要禁用两步验证，请输入您的账户密码进行确认。<br>
+                    <strong class="text-red-600">注意：禁用两步验证将降低您账户的安全性。</strong>
+                </p>
+                
+                <form method="post" action="/totp-setup/disable" class="space-y-4">
+                    <div>
+                        <label for="password" class="block text-sm font-medium text-gray-700 mb-1">账户密码</label>
+                        <input type="password" id="password" name="password" required 
+                               class="w-full px-4 py-2 border border-gray-300 rounded-lg focus:ring-red-500 focus:border-red-500 transition-colors" 
+                               placeholder="请输入您的账户密码">
+                    </div>
+                    
+                    <div class="pt-2">
+                        <button type="submit" class="bg-red-500 hover:bg-red-600 text-white px-4 py-2 rounded-lg transition-colors btn">
+                            禁用两步验证
+                        </button>
+                    </div>
+                </form>
+            </div>
+            {% else %}
+            <!-- 启用两步验证 -->
+            <h2 class="text-xl font-semibold mb-4 text-gray-700">启用两步验证</h2>
+            <div class="mb-6">
+                <p class="text-gray-600 mb-4">
+                    两步验证可以为您的账户添加额外的安全层。启用后，登录时除了输入密码外，还需要提供手机身份验证器生成的验证码。
+                </p>
+                
+                <div class="mb-6">
+                    <h3 class="font-semibold text-gray-700 mb-2">步骤1：扫描二维码</h3>
+                    <p class="text-gray-600 mb-4">
+                        使用身份验证器应用（如Google Authenticator、Microsoft Authenticator或Authy）扫描下方二维码：
+                    </p>
+                    
+                    <div class="qr-container p-4 bg-white border rounded-lg mb-6">
+                        <img src="data:image/png;base64,{{ qr_code }}" alt="TOTP QR Code" class="mx-auto">
+                    </div>
+                </div>
+                
+                <div class="mb-6">
+                    <h3 class="font-semibold text-gray-700 mb-2">步骤2：手动设置（可选）</h3>
+                    <p class="text-gray-600 mb-2">
+                        如果无法扫描二维码，可以在身份验证器应用中手动输入以下密钥：
+                    </p>
+                    
+                    <div class="relative">
+                        <div id="secret-key" class="secret-key mb-4 text-center">
+                            {{ totp_secret }}
+                        </div>
+                        <button id="copy-btn" class="copy-btn bg-blue-500 text-white p-1 rounded hover:bg-blue-600 transition-colors">
+                            <svg xmlns="http://www.w3.org/2000/svg" class="h-4 w-4" fill="none" viewBox="0 0 24 24" stroke="currentColor">
+                                <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M8 5H6a2 2 0 00-2 2v12a2 2 0 002 2h10a2 2 0 002-2v-1M8 5a2 2 0 002 2h2a2 2 0 002-2M8 5a2 2 0 012-2h2a2 2 0 012 2m0 0h2a2 2 0 012 2v3m2 4H10m0 0l3-3m-3 3l3 3" />
+                            </svg>
+                        </button>
+                    </div>
+                    <p class="text-sm text-gray-500 mb-4">
+                        应用中输入时请选择"基于时间"类型，账户名称设为"{{ user.username }}@PicUI图床"
+                    </p>
+                </div>
+                
+                <div>
+                    <h3 class="font-semibold text-gray-700 mb-2">步骤3：验证并激活</h3>
+                    <p class="text-gray-600 mb-4">
+                        输入身份验证器应用中显示的6位验证码以完成设置：
+                    </p>
+                    
+                    <form method="post" action="/totp-setup/enable" class="space-y-4">
+                        <div>
+                            <input type="text" id="totp_code" name="totp_code" required 
+                                   class="w-full px-4 py-3 text-center text-2xl font-mono font-bold tracking-widest border border-gray-300 rounded-lg focus:ring-blue-500 focus:border-blue-500 transition-colors"
+                                   placeholder="000000"
+                                   maxlength="6"
+                                   pattern="\d{6}"
+                                   autocomplete="off">
+                        </div>
+                        
+                        <div class="pt-2">
+                            <button type="submit" class="bg-green-500 hover:bg-green-600 text-white px-6 py-2 rounded-lg transition-colors btn">
+                                验证并启用
+                            </button>
+                        </div>
+                    </form>
+                </div>
+            </div>
+            {% endif %}
+        </div>
+        
+        <!-- 安全提示 -->
+        <div class="bg-yellow-50 rounded-xl p-6 shadow-md mb-8 border-l-4 border-yellow-400">
+            <h2 class="text-lg font-semibold mb-2 text-yellow-800">重要安全提示</h2>
+            <ul class="list-disc pl-5 space-y-2 text-yellow-700">
+                <li>请务必妥善保存您的身份验证器应用和恢复代码</li>
+                <li>如果您丢失了访问验证器的途径，可能无法登录您的账户</li>
+                <li>建议在多台设备上设置身份验证器，以防一台设备丢失</li>
+                <li>两步验证大大提高了账户安全性，防止密码泄露带来的风险</li>
+            </ul>
+        </div>
+        
+        <!-- 页脚 -->
+        <div class="mt-10 text-center text-sm text-gray-500">
+            <p>PicUI 图床服务 &copy; {{ now.year }}</p>
+        </div>
+    </div>
+    
+    <script>
+        document.addEventListener('DOMContentLoaded', function() {
+            // 复制密钥功能
+            const copyBtn = document.getElementById('copy-btn');
+            if (copyBtn) {
+                copyBtn.addEventListener('click', function() {
+                    const secretKey = document.getElementById('secret-key').textContent.trim();
+                    navigator.clipboard.writeText(secretKey).then(() => {
+                        alert('密钥已复制到剪贴板！');
+                    });
+                });
+            }
+            
+            // 限制验证码只能输入数字
+            const totpInput = document.getElementById('totp_code');
+            if (totpInput) {
+                totpInput.addEventListener('input', function() {
+                    this.value = this.value.replace(/\D/g, '').substr(0, 6);
+                });
+            }
+        });
+    </script>
+</body>
+</html> 

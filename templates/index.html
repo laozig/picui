@@ -1,0 +1,105 @@
+<!DOCTYPE html>
+<html>
+<head>
+    <meta charset="utf-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>PicUI图床服务</title>
+    <style>
+        body {
+            font-family: 'Segoe UI', Tahoma, Geneva, Verdana, sans-serif;
+            margin: 0;
+            padding: 0;
+            background-color: #f5f5f5;
+            color: #333;
+        }
+        header {
+            background-color: #3498db;
+            color: white;
+            padding: 20px;
+            text-align: center;
+        }
+        .container {
+            max-width: 1200px;
+            margin: 0 auto;
+            padding: 20px;
+        }
+        .card {
+            background-color: white;
+            border-radius: 5px;
+            box-shadow: 0 2px 5px rgba(0,0,0,0.1);
+            padding: 20px;
+            margin-bottom: 20px;
+        }
+        h1, h2 {
+            margin-top: 0;
+        }
+        .btn {
+            display: inline-block;
+            padding: 10px 15px;
+            background-color: #3498db;
+            color: white;
+            text-decoration: none;
+            border-radius: 3px;
+            margin-right: 10px;
+            margin-bottom: 10px;
+        }
+        .btn:hover {
+            background-color: #2980b9;
+        }
+        .upload-form {
+            margin-top: 20px;
+        }
+        .footer {
+            text-align: center;
+            padding: 20px;
+            background-color: #333;
+            color: white;
+        }
+        @media (max-width: 768px) {
+            .container {
+                padding: 10px;
+            }
+        }
+    </style>
+</head>
+<body>
+    <header>
+        <h1>PicUI图床服务</h1>
+        <p>简单高效的图片上传和管理服务</p>
+    </header>
+    <div class="container">
+        <div class="card">
+            <h2>功能简介</h2>
+            <p>PicUI是一个轻量级的图床服务，支持以下功能：</p>
+            <ul>
+                <li>图片上传与管理</li>
+                <li>图片水印添加</li>
+                <li>图片自动压缩和尺寸限制</li>
+                <li>短链接和临时外链功能</li>
+                <li>短链管理</li>
+            </ul>
+        </div>
+        
+        <div class="card">
+            <h2>快速访问</h2>
+            <a href="/admin" class="btn">管理面板</a>
+            <a href="/login" class="btn">用户登录</a>
+            <a href="/register" class="btn">注册账号</a>
+        </div>
+        
+        {% if current_user %}
+        <div class="card">
+            <h2>快速上传</h2>
+            <form class="upload-form" action="/upload" method="post" enctype="multipart/form-data">
+                <input type="file" name="file" required>
+                <input type="hidden" name="token" value="{{ current_user.api_token }}">
+                <button type="submit" class="btn">上传图片</button>
+            </form>
+        </div>
+        {% endif %}
+    </div>
+    <div class="footer">
+        <p>PicUI图床服务 &copy; 2023</p>
+    </div>
+</body>
+</html> 

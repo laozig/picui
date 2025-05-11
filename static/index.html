@@ -522,6 +522,53 @@
                     htmlCode.value = `<img src="${data.url}" alt="image">`;
                     mdCode.value = `![image](${data.url})`;
                     
+                    // 添加短链接信息
+                    if (data.short_url) {
+                        const shortUrlContainer = document.createElement('div');
+                        shortUrlContainer.className = 'mt-4';
+                        shortUrlContainer.innerHTML = `
+                            <div class="flex flex-col">
+                                <label class="text-sm font-medium text-gray-600 mb-1">短链接:</label>
+                                <div class="flex">
+                                    <input type="text" value="${data.short_url}" readonly 
+                                        class="border rounded-l px-3 py-2 w-full bg-gray-50 focus:outline-none">
+                                    <button class="bg-blue-500 hover:bg-blue-600 text-white px-3 py-2 rounded-r" 
+                                        onclick="navigator.clipboard.writeText('${data.short_url}');this.textContent='已复制!';setTimeout(()=>this.textContent='复制',1500)">
+                                        复制
+                                    </button>
+                                </div>
+                            </div>
+                        `;
+                        // 在mdCode后面插入
+                        mdCode.parentNode.parentNode.insertAdjacentElement('afterend', shortUrlContainer);
+                    }
+                    
+                    // 添加水印链接
+                    const watermarkContainer = document.createElement('div');
+                    watermarkContainer.className = 'mt-6';
+                    watermarkContainer.innerHTML = `
+                        <div class="flex flex-col">
+                            <label class="text-sm font-medium text-gray-600 mb-1">水印功能:</label>
+                            <div class="flex">
+                                <a href="${data.url}/watermark" target="_blank" 
+                                    class="bg-purple-500 hover:bg-purple-600 text-white px-4 py-2 rounded-l transition flex-1 text-center">
+                                    <i class="fas fa-image mr-1"></i> 查看带水印版本
+                                </a>
+                                <a href="${data.url}/watermark?download=true" 
+                                    class="bg-green-500 hover:bg-green-600 text-white px-4 py-2 rounded-r transition flex-1 text-center">
+                                    <i class="fas fa-download mr-1"></i> 下载带水印版本
+                                </a>
+                            </div>
+                            <div class="mt-2 text-xs text-gray-500">
+                                默认水印位置在右下角，可在URL后添加参数 <code>?text=自定义文本&position=位置&opacity=不透明度</code> 进行自定义。
+                                <br>
+                                位置可选：<code>center</code>, <code>bottom-right</code>, <code>bottom-left</code>, <code>top-right</code>, <code>top-left</code>
+                            </div>
+                        </div>
+                    `;
+                    // 在最后插入
+                    resultArea.insertBefore(watermarkContainer, uploadAnother.parentNode);
+                    
                     // 设置打开链接
                     openImage.href = data.url;
                     

@@ -1,0 +1,271 @@
+<!DOCTYPE html>
+<html lang="zh-CN">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>短链接管理 - PicUI图床</title>
+    <link href="https://cdn.bootcdn.net/ajax/libs/tailwindcss/2.2.19/tailwind.min.css" rel="stylesheet">
+    <link rel="stylesheet" href="https://cdn.bootcdn.net/ajax/libs/font-awesome/5.15.4/css/all.min.css">
+    <style>
+        .pagination a {
+            display: inline-block;
+            padding: 0.5rem 1rem;
+            margin: 0 0.25rem;
+            border-radius: 0.25rem;
+        }
+
+        .pagination a.active {
+            background-color: #4F46E5;
+            color: white;
+        }
+
+        .pagination a:hover:not(.active) {
+            background-color: #E5E7EB;
+        }
+        
+        .tooltip {
+            position: relative;
+            display: inline-block;
+        }
+        
+        .tooltip .tooltiptext {
+            visibility: hidden;
+            width: 180px;
+            background-color: #333;
+            color: #fff;
+            text-align: center;
+            border-radius: 6px;
+            padding: 5px;
+            position: absolute;
+            z-index: 1;
+            bottom: 125%;
+            left: 50%;
+            margin-left: -90px;
+            opacity: 0;
+            transition: opacity 0.3s;
+        }
+        
+        .tooltip:hover .tooltiptext {
+            visibility: visible;
+            opacity: 1;
+        }
+    </style>
+</head>
+<body class="bg-gray-100 min-h-screen">
+    <div class="container mx-auto px-4 py-8">
+        <div class="flex justify-between items-center mb-6">
+            <h1 class="text-2xl font-bold text-gray-800">短链接管理</h1>
+            <div>
+                <a href="/admin" class="bg-gray-600 hover:bg-gray-700 text-white font-bold py-2 px-4 rounded">
+                    <i class="fas fa-arrow-left mr-2"></i>返回管理面板
+                </a>
+            </div>
+        </div>
+
+        <!-- 搜索表单 -->
+        <div class="mb-6">
+            <form action="/admin/short-links" method="get" class="flex items-center">
+                <input type="text" name="search" value="{{ search }}" placeholder="搜索短链接、文件名..." 
+                    class="px-4 py-2 border rounded-l focus:outline-none focus:ring-2 focus:ring-blue-500 flex-1">
+                <button type="submit" class="bg-blue-500 hover:bg-blue-600 text-white px-4 py-2 rounded-r">
+                    <i class="fas fa-search mr-1"></i> 搜索
+                </button>
+            </form>
+        </div>
+
+        <div class="bg-white shadow-md rounded-lg overflow-hidden">
+            <div class="overflow-x-auto">
+                <table class="min-w-full divide-y divide-gray-200">
+                    <thead class="bg-gray-50">
+                        <tr>
+                            <th scope="col" class="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">短链编码</th>
+                            <th scope="col" class="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">目标文件</th>
+                            <th scope="col" class="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">创建时间</th>
+                            <th scope="col" class="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">过期时间</th>
+                            <th scope="col" class="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">访问次数</th>
+                            <th scope="col" class="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">状态</th>
+                            <th scope="col" class="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">操作</th>
+                        </tr>
+                    </thead>
+                    <tbody class="bg-white divide-y divide-gray-200">
+                        {% for link in short_links %}
+                        <tr class="hover:bg-gray-50">
+                            <td class="px-6 py-4 whitespace-nowrap text-sm text-gray-500">
+                                <div class="tooltip">
+                                    <a href="/s/{{ link.code }}" target="_blank" class="font-mono text-blue-500 hover:text-blue-700">
+                                        {{ link.code }}
+                                    </a>
+                                    <span class="tooltiptext" id="tooltip-{{ link.code }}">点击跳转到图片</span>
+                                </div>
+                                <button class="ml-2 text-gray-500 hover:text-gray-700 focus:outline-none" 
+                                        onclick="copyToClipboard('/s/{{ link.code }}', 'tooltip-{{ link.code }}')">
+                                    <i class="fas fa-copy"></i>
+                                </button>
+                            </td>
+                            <td class="px-6 py-4 whitespace-nowrap text-sm text-gray-500">
+                                <a href="/images/{{ link.target_file }}" target="_blank" class="text-blue-500 hover:text-blue-700">
+                                    {{ link.target_file }}
+                                </a>
+                            </td>
+                            <td class="px-6 py-4 whitespace-nowrap text-sm text-gray-500">
+                                {{ link.created_at.strftime('%Y-%m-%d %H:%M:%S') }}
+                            </td>
+                            <td class="px-6 py-4 whitespace-nowrap text-sm text-gray-500">
+                                {% if link.expire_at %}
+                                    {{ link.expire_at.strftime('%Y-%m-%d %H:%M:%S') }}
+                                {% else %}
+                                    <span class="text-green-600">永不过期</span>
+                                {% endif %}
+                            </td>
+                            <td class="px-6 py-4 whitespace-nowrap text-sm text-gray-500">
+                                {{ link.access_count }}
+                            </td>
+                            <td class="px-6 py-4 whitespace-nowrap text-sm">
+                                {% if link.expire_at and link.expire_at < now %}
+                                    <span class="px-2 inline-flex text-xs leading-5 font-semibold rounded-full bg-red-100 text-red-800">已过期</span>
+                                {% else %}
+                                    <span class="px-2 inline-flex text-xs leading-5 font-semibold rounded-full bg-green-100 text-green-800">有效</span>
+                                {% endif %}
+                            </td>
+                            <td class="px-6 py-4 whitespace-nowrap text-sm text-gray-500">
+                                <button class="text-red-500 hover:text-red-700 focus:outline-none" 
+                                        onclick="deleteShortLink('{{ link.code }}')">
+                                    <i class="fas fa-trash-alt"></i> 删除
+                                </button>
+                            </td>
+                        </tr>
+                        {% endfor %}
+
+                        {% if short_links|length == 0 %}
+                        <tr>
+                            <td colspan="7" class="px-6 py-4 text-center text-gray-500">
+                                暂无短链接数据
+                            </td>
+                        </tr>
+                        {% endif %}
+                    </tbody>
+                </table>
+            </div>
+        </div>
+
+        <!-- 分页控件 -->
+        <div class="mt-6 flex justify-between items-center">
+            <div class="text-sm text-gray-700">
+                共 <span class="font-medium">{{ total }}</span> 条记录，
+                当前第 <span class="font-medium">{{ page }}</span> 页，
+                共 <span class="font-medium">{{ total_pages }}</span> 页
+            </div>
+            <div class="pagination">
+                {% if page > 1 %}
+                <a href="/admin/short-links?page=1&search={{ search }}" class="bg-white border border-gray-300 text-gray-500 hover:bg-gray-50">
+                    <i class="fas fa-angle-double-left"></i>
+                </a>
+                <a href="/admin/short-links?page={{ page - 1 }}&search={{ search }}" class="bg-white border border-gray-300 text-gray-500 hover:bg-gray-50">
+                    <i class="fas fa-angle-left"></i>
+                </a>
+                {% endif %}
+
+                {% for p in range(max(1, page - 2), min(total_pages + 1, page + 3)) %}
+                <a href="/admin/short-links?page={{ p }}&search={{ search }}" class="bg-white border border-gray-300 text-gray-500 hover:bg-gray-50 {% if p == page %}active{% endif %}">
+                    {{ p }}
+                </a>
+                {% endfor %}
+
+                {% if page < total_pages %}
+                <a href="/admin/short-links?page={{ page + 1 }}&search={{ search }}" class="bg-white border border-gray-300 text-gray-500 hover:bg-gray-50">
+                    <i class="fas fa-angle-right"></i>
+                </a>
+                <a href="/admin/short-links?page={{ total_pages }}&search={{ search }}" class="bg-white border border-gray-300 text-gray-500 hover:bg-gray-50">
+                    <i class="fas fa-angle-double-right"></i>
+                </a>
+                {% endif %}
+            </div>
+        </div>
+    </div>
+
+    <!-- 确认删除对话框 -->
+    <div id="deleteModal" class="fixed inset-0 bg-black bg-opacity-50 flex items-center justify-center z-50 hidden">
+        <div class="bg-white rounded-lg p-6 max-w-md">
+            <h3 class="text-lg font-bold mb-4">确认删除</h3>
+            <p>您确定要删除此短链接吗？此操作无法撤销。</p>
+            <div class="mt-6 flex justify-end space-x-4">
+                <button id="cancelDelete" class="px-4 py-2 bg-gray-300 hover:bg-gray-400 rounded">取消</button>
+                <button id="confirmDelete" class="px-4 py-2 bg-red-500 hover:bg-red-600 text-white rounded">确认删除</button>
+            </div>
+        </div>
+    </div>
+
+    <script>
+        // 复制短链接到剪贴板
+        function copyToClipboard(text, tooltipId) {
+            // 创建完整链接
+            const fullUrl = window.location.origin + text;
+            
+            // 复制到剪贴板
+            navigator.clipboard.writeText(fullUrl).then(function() {
+                // 更新提示文本
+                const tooltip = document.getElementById(tooltipId);
+                tooltip.textContent = "已复制到剪贴板！";
+                
+                // 2秒后恢复原始提示
+                setTimeout(() => {
+                    tooltip.textContent = "点击跳转到图片";
+                }, 2000);
+            }).catch(function(err) {
+                console.error('无法复制: ', err);
+            });
+        }
+        
+        // 删除短链接
+        function deleteShortLink(code) {
+            const modal = document.getElementById('deleteModal');
+            const cancelBtn = document.getElementById('cancelDelete');
+            const confirmBtn = document.getElementById('confirmDelete');
+            
+            // 显示确认对话框
+            modal.classList.remove('hidden');
+            
+            // 点击取消按钮
+            cancelBtn.onclick = function() {
+                modal.classList.add('hidden');
+            };
+            
+            // 点击确认按钮
+            confirmBtn.onclick = function() {
+                // 发送删除请求
+                fetch(`/admin/short-links/${code}`, {
+                    method: 'DELETE',
+                    headers: {
+                        'Content-Type': 'application/json',
+                    }
+                })
+                .then(response => {
+                    if (response.ok) {
+                        return response.json();
+                    }
+                    throw new Error('删除失败');
+                })
+                .then(data => {
+                    console.log('删除成功:', data);
+                    // 刷新页面
+                    window.location.reload();
+                })
+                .catch(error => {
+                    console.error('错误:', error);
+                    alert('删除短链接时出错');
+                })
+                .finally(() => {
+                    modal.classList.add('hidden');
+                });
+            };
+            
+            // 点击其他区域关闭对话框
+            modal.onclick = function(event) {
+                if (event.target === modal) {
+                    modal.classList.add('hidden');
+                }
+            };
+        }
+    </script>
+</body>
+</html> 

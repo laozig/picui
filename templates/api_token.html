@@ -1,0 +1,316 @@
+<!DOCTYPE html>
+<html lang="zh-CN">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>PicUI - API Token管理</title>
+    <link rel="icon" href="data:image/svg+xml,<svg xmlns=%22http://www.w3.org/2000/svg%22 viewBox=%220 0 100 100%22><text y=%22.9em%22 font-size=%2290%22>🖼️</text></svg>">
+    <!-- 引入TailwindCSS -->
+    <script src="https://cdn.tailwindcss.com"></script>
+    <style>
+        @import url('https://fonts.googleapis.com/css2?family=Nunito:wght@400;500;600;700&display=swap');
+        
+        body {
+            font-family: 'Nunito', system-ui, sans-serif;
+            background-color: #f9fafb;
+            background-image: 
+                radial-gradient(circle at 25px 25px, #e5e7eb 2px, transparent 0),
+                radial-gradient(circle at 75px 75px, #e5e7eb 2px, transparent 0);
+            background-size: 100px 100px;
+        }
+        
+        .container {
+            max-width: 900px;
+            box-shadow: 0 10px 30px rgba(0, 0, 0, 0.08);
+            border: 1px solid rgba(0, 0, 0, 0.05);
+            backdrop-filter: blur(10px);
+            background-color: rgba(255, 255, 255, 0.95);
+        }
+        
+        .btn {
+            transition: all 0.3s ease;
+            position: relative;
+            overflow: hidden;
+        }
+        
+        .btn:hover {
+            transform: translateY(-2px);
+            box-shadow: 0 4px 12px rgba(0, 0, 0, 0.1);
+        }
+        
+        .logo-text {
+            background: linear-gradient(135deg, #3b82f6 0%, #2563eb 100%);
+            -webkit-background-clip: text;
+            -webkit-text-fill-color: transparent;
+        }
+        
+        .token-container {
+            font-family: monospace;
+            background-color: #f3f4f6;
+            border-radius: 0.5rem;
+            padding: 1rem;
+            position: relative;
+        }
+        
+        .copy-btn {
+            position: absolute;
+            top: 0.5rem;
+            right: 0.5rem;
+        }
+        
+        .loading {
+            position: fixed;
+            top: 0;
+            left: 0;
+            width: 100%;
+            height: 100%;
+            background-color: rgba(255, 255, 255, 0.8);
+            display: flex;
+            justify-content: center;
+            align-items: center;
+            z-index: 1000;
+        }
+        
+        .spinner {
+            width: 40px;
+            height: 40px;
+            border: 4px solid rgba(59, 130, 246, 0.3);
+            border-radius: 50%;
+            border-top-color: #3b82f6;
+            animation: spin 1s linear infinite;
+        }
+        
+        @keyframes spin {
+            0% { transform: rotate(0deg); }
+            100% { transform: rotate(360deg); }
+        }
+        
+        @keyframes fadeIn {
+            from { opacity: 0; }
+            to { opacity: 1; }
+        }
+        
+        .fade-in {
+            animation: fadeIn 0.5s;
+        }
+    </style>
+</head>
+<body class="min-h-screen py-10">
+    <!-- 加载中遮罩 -->
+    <div id="loading" class="loading hidden">
+        <div class="spinner"></div>
+    </div>
+
+    <div class="container mx-auto p-8 rounded-3xl">
+        <div class="flex items-center justify-between mb-6">
+            <div class="flex items-center">
+                <div class="bg-blue-500 text-white p-3 rounded-xl mr-3 shadow-lg">
+                    <svg xmlns="http://www.w3.org/2000/svg" class="h-8 w-8" fill="none" viewBox="0 0 24 24" stroke="currentColor">
+                        <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M15 7a2 2 0 012 2m4 0a6 6 0 01-7.743 5.743L11 17H9v2H7v2H4a1 1 0 01-1-1v-2.586a1 1 0 01.293-.707l5.964-5.964A6 6 0 1121 9z" />
+                    </svg>
+                </div>
+                <h1 class="text-3xl font-bold">
+                    <span class="logo-text">PicUI</span>
+                    <span class="text-gray-700">API Token管理</span>
+                </h1>
+            </div>
+            <div class="flex space-x-2">
+                <a href="/dashboard" class="bg-blue-100 hover:bg-blue-200 text-blue-700 px-4 py-2 rounded-lg transition-colors btn flex items-center">
+                    <svg xmlns="http://www.w3.org/2000/svg" class="h-4 w-4 mr-1" fill="none" viewBox="0 0 24 24" stroke="currentColor">
+                        <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M3 12l2-2m0 0l7-7 7 7M5 10v10a1 1 0 001 1h3m10-11l2 2m-2-2v10a1 1 0 01-1 1h-3m-6 0a1 1 0 001-1v-4a1 1 0 011-1h2a1 1 0 011 1v4a1 1 0 001 1m-6 0h6" />
+                    </svg>
+                    仪表板
+                </a>
+                <a href="/logout" class="bg-red-100 hover:bg-red-200 text-red-700 px-4 py-2 rounded-lg transition-colors btn flex items-center">
+                    <svg xmlns="http://www.w3.org/2000/svg" class="h-4 w-4 mr-1" fill="none" viewBox="0 0 24 24" stroke="currentColor">
+                        <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M17 16l4-4m0 0l-4-4m4 4H7m6 4v1a3 3 0 01-3 3H6a3 3 0 01-3-3V7a3 3 0 013-3h4a3 3 0 013 3v1" />
+                    </svg>
+                    登出
+                </a>
+            </div>
+        </div>
+        
+        <!-- API Token卡片 -->
+        <div class="bg-white rounded-xl p-6 shadow-md mb-8">
+            <h2 class="text-xl font-semibold mb-4 text-gray-700 flex items-center">
+                <svg xmlns="http://www.w3.org/2000/svg" class="h-5 w-5 mr-2 text-blue-500" fill="none" viewBox="0 0 24 24" stroke="currentColor">
+                    <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M15 7a2 2 0 012 2m4 0a6 6 0 01-7.743 5.743L11 17H9v2H7v2H4a1 1 0 01-1-1v-2.586a1 1 0 01.293-.707l5.964-5.964A6 6 0 1121 9z" />
+                </svg>
+                您的API Token
+            </h2>
+            
+            <div class="mb-6">
+                <p class="text-gray-600 mb-4">
+                    API Token用于通过API上传图片和访问其他需要身份验证的功能。请妥善保管您的Token，不要泄露给他人。
+                </p>
+                
+                <div class="token-container relative">
+                    <code id="api-token" class="text-gray-800 block break-all">{{ user.api_token }}</code>
+                    <button id="copy-btn" class="copy-btn bg-blue-500 text-white p-1 rounded hover:bg-blue-600 transition-colors">
+                        <svg xmlns="http://www.w3.org/2000/svg" class="h-4 w-4" fill="none" viewBox="0 0 24 24" stroke="currentColor">
+                            <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M8 5H6a2 2 0 00-2 2v12a2 2 0 002 2h10a2 2 0 002-2v-1M8 5a2 2 0 002 2h2a2 2 0 002-2M8 5a2 2 0 012-2h2a2 2 0 012 2m0 0h2a2 2 0 012 2v3m2 4H10m0 0l3-3m-3 3l3 3" />
+                        </svg>
+                    </button>
+                </div>
+                
+                <div class="mt-2 text-sm text-gray-500">
+                    <span id="copy-message" class="hidden fade-in text-green-600">已复制到剪贴板！</span>
+                </div>
+            </div>
+            
+            <div class="border-t pt-6">
+                <h3 class="font-semibold text-gray-700 mb-2">重新生成Token</h3>
+                <p class="text-gray-600 mb-4">
+                    如果您的Token已泄露或出于安全考虑需要更换，可以重新生成一个新的Token。
+                    <strong class="text-red-600">注意：重新生成后，旧的Token将立即失效。</strong>
+                </p>
+                
+                <button id="regenerate-btn" class="bg-yellow-500 hover:bg-yellow-600 text-white px-4 py-2 rounded-lg transition-colors btn">
+                    重新生成Token
+                </button>
+            </div>
+        </div>
+        
+        <!-- 使用说明卡片 -->
+        <div class="bg-white rounded-xl p-6 shadow-md mb-8">
+            <h2 class="text-xl font-semibold mb-4 text-gray-700 flex items-center">
+                <svg xmlns="http://www.w3.org/2000/svg" class="h-5 w-5 mr-2 text-blue-500" fill="none" viewBox="0 0 24 24" stroke="currentColor">
+                    <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M13 16h-1v-4h-1m1-4h.01M21 12a9 9 0 11-18 0 9 9 0 0118 0z" />
+                </svg>
+                API使用说明
+            </h2>
+            
+            <div class="space-y-4">
+                <div>
+                    <h3 class="font-semibold text-gray-700 mb-1">上传图片</h3>
+                    <p class="text-gray-600 mb-2">
+                        使用以下命令上传图片：
+                    </p>
+                    <div class="bg-gray-100 p-3 rounded-lg">
+                        <code class="text-sm text-gray-800">
+                            curl -X POST "http://localhost:8000/upload" -F "file=@图片路径.jpg" -F "token={{ user.api_token }}"
+                        </code>
+                    </div>
+                </div>
+                
+                <div>
+                    <h3 class="font-semibold text-gray-700 mb-1">查看图片列表</h3>
+                    <p class="text-gray-600 mb-2">
+                        获取您上传的所有图片：
+                    </p>
+                    <div class="bg-gray-100 p-3 rounded-lg">
+                        <code class="text-sm text-gray-800">
+                            curl "http://localhost:8000/images?user_id={{ user.id }}"
+                        </code>
+                    </div>
+                </div>
+                
+                <div>
+                    <h3 class="font-semibold text-gray-700 mb-1">更多API</h3>
+                    <p class="text-gray-600">
+                        查看完整的API文档：<a href="/docs" class="text-blue-500 hover:underline">API文档</a>
+                    </p>
+                </div>
+            </div>
+        </div>
+        
+        <!-- 页脚 -->
+        <div class="mt-10 text-center text-sm text-gray-500">
+            <p>PicUI 图床服务 &copy; {{ now.year }} | <a href="/docs" class="text-blue-500 hover:underline">API文档</a></p>
+        </div>
+    </div>
+
+    <!-- 确认重新生成模态框 -->
+    <div id="regenerate-modal" class="fixed inset-0 bg-black bg-opacity-50 flex items-center justify-center z-50 hidden">
+        <div class="bg-white rounded-lg p-6 max-w-md w-full">
+            <h3 class="text-lg font-semibold mb-4">确认重新生成</h3>
+            <p class="mb-6 text-gray-700">您确定要重新生成API Token吗？旧的Token将立即失效，使用旧Token的应用将无法继续工作。</p>
+            <div class="flex justify-end space-x-3">
+                <button id="cancel-regenerate" class="bg-gray-200 hover:bg-gray-300 text-gray-700 px-4 py-2 rounded-lg transition-colors">
+                    取消
+                </button>
+                <button id="confirm-regenerate" class="bg-yellow-500 hover:bg-yellow-600 text-white px-4 py-2 rounded-lg transition-colors">
+                    确认重新生成
+                </button>
+            </div>
+        </div>
+    </div>
+
+    <script>
+        document.addEventListener('DOMContentLoaded', function() {
+            const apiToken = document.getElementById('api-token');
+            const copyBtn = document.getElementById('copy-btn');
+            const copyMessage = document.getElementById('copy-message');
+            const regenerateBtn = document.getElementById('regenerate-btn');
+            const regenerateModal = document.getElementById('regenerate-modal');
+            const cancelRegenerate = document.getElementById('cancel-regenerate');
+            const confirmRegenerate = document.getElementById('confirm-regenerate');
+            const loading = document.getElementById('loading');
+            
+            // 复制Token到剪贴板
+            copyBtn.addEventListener('click', function() {
+                navigator.clipboard.writeText(apiToken.textContent).then(function() {
+                    copyMessage.classList.remove('hidden');
+                    setTimeout(function() {
+                        copyMessage.classList.add('hidden');
+                    }, 3000);
+                });
+            });
+            
+            // 显示重新生成确认模态框
+            regenerateBtn.addEventListener('click', function() {
+                regenerateModal.classList.remove('hidden');
+            });
+            
+            // 取消重新生成
+            cancelRegenerate.addEventListener('click', function() {
+                regenerateModal.classList.add('hidden');
+            });
+            
+            // 点击模态框外部关闭
+            regenerateModal.addEventListener('click', function(e) {
+                if (e.target === regenerateModal) {
+                    regenerateModal.classList.add('hidden');
+                }
+            });
+            
+            // 确认重新生成
+            confirmRegenerate.addEventListener('click', function() {
+                showLoading();
+                
+                fetch('/api-token/regenerate', {
+                    method: 'POST'
+                })
+                .then(response => {
+                    if (!response.ok) {
+                        throw new Error(`HTTP错误: ${response.status}`);
+                    }
+                    return response.json();
+                })
+                .then(data => {
+                    apiToken.textContent = data.token;
+                    regenerateModal.classList.add('hidden');
+                    hideLoading();
+                    
+                    // 显示成功消息
+                    alert('API Token已成功重新生成！');
+                })
+                .catch(error => {
+                    console.error('重新生成Token错误:', error);
+                    alert(`操作失败: ${error.message}`);
+                    hideLoading();
+                });
+            });
+            
+            // 显示/隐藏加载中
+            function showLoading() {
+                loading.classList.remove('hidden');
+            }
+            
+            function hideLoading() {
+                loading.classList.add('hidden');
+            }
+        });
+    </script>
+</body>
+</html> 
