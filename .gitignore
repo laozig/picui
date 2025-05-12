@@ -91,6 +91,9 @@ picui.db-journal
 .picui_cache/
 fix_*.py  # 修复脚本
 check_*.py  # 检查脚本
+*_backup_*.db  # 备份数据库文件
+*.html.bak  # HTML备份文件
+static/*.html.bak  # 静态HTML备份文件
 
 # Docker
 .dockerignore

@@ -417,7 +417,16 @@ async def upload_image(
                         logger.error(f"记录上传日志时出错: {str(db_error)}")
                 
                 # 生成访问URL
-                access_url = f"{BASE_URL}/images/{filename}"
+                if request:
+                    base_url = f"{request.url.scheme}://{request.url.netloc}"
+                    access_url = f"{base_url}/images/{filename}"
+                else:
+                    # 如果没有request对象且BASE_URL为空，使用合理的默认值
+                    if not BASE_URL:
+                        base_url = "http://localhost:8000"
+                    else:
+                        base_url = BASE_URL
+                    access_url = f"{base_url}/images/{filename}"
                 
                 # 自动生成短链接 (设置为3天有效期)
                 short_url = None
@@ -437,7 +446,11 @@ async def upload_image(
                         if request:
                             base_url = f"{request.url.scheme}://{request.url.netloc}"
                         else:
-                            base_url = BASE_URL
+                            # 如果没有request对象且BASE_URL为空，使用合理的默认值
+                            if not BASE_URL:
+                                base_url = "http://localhost:8000"
+                            else:
+                                base_url = BASE_URL
                         
                         short_url = f"{base_url}/s/{code}"
                         logger.info(f"自动生成短链接成功: {short_url}")
@@ -557,7 +570,7 @@ async def delete_image(
 
 # 短链接重定向
 @router.get("/s/{code}", tags=["短链接"], summary="访问短链接", description="通过短链接代码访问图片")
-async def access_short_link(code: str, db: Session = Depends(get_db)):
+async def access_short_link(code: str, request: Request = None, db: Session = Depends(get_db)):
     """通过短链接访问图片"""
     # 记录访问信息
     logger.info(f"短链接访问: code={code}")
@@ -600,8 +613,16 @@ async def access_short_link(code: str, db: Session = Depends(get_db)):
                 )
             
             # 2. 如果没有找到图片信息，使用重定向
-            logger.info(f"短链接重定向: code={code} -> /images/{short_link.target_file}")
-            return RedirectResponse(url=f"/images/{short_link.target_file}")
+            if request:
+                # 使用请求的原始主机构建完整URL
+                base_url = f"{request.url.scheme}://{request.url.netloc}"
+                redirect_url = f"{base_url}/images/{short_link.target_file}"
+            else:
+                # 退回到相对URL
+                redirect_url = f"/images/{short_link.target_file}"
+                
+            logger.info(f"短链接重定向: code={code} -> {redirect_url}")
+            return RedirectResponse(url=redirect_url)
             
         except Exception as e:
             db.rollback()
@@ -757,11 +778,15 @@ async def create_temp_link(
             logger.error(f"创建短链接失败: {str(e)}", exc_info=True)
             raise HTTPException(status_code=500, detail="创建短链接时发生错误")
         
-        # 生成完整URL
+        # 生成完整URL - 优先使用请求的原始主机
         if request:
             base_url = f"{request.url.scheme}://{request.url.netloc}"
         else:
-            base_url = BASE_URL
+            # 如果没有request对象且BASE_URL为空，使用合理的默认值
+            if not BASE_URL:
+                base_url = "http://localhost:8000"
+            else:
+                base_url = BASE_URL
         
         short_url = f"{base_url}/s/{code}"
         logger.info(f"临时外链创建成功: code={code}, url={short_url}")
@@ -781,3 +806,46 @@ async def create_temp_link(
     except Exception as e:
         logger.error(f"创建临时外链时发生未知错误: {str(e)}", exc_info=True)
         raise HTTPException(status_code=500, detail=f"创建临时外链时发生未知错误: {str(e)}")
+
+# API删除短链接
+@router.delete("/admin/short-links/{code}", tags=["短链接"], summary="删除短链接", description="删除指定的短链接")
+async def api_delete_short_link(
+    code: str,
+    request: Request = None,
+    db: Session = Depends(get_db)
+):
+    """删除指定的短链接"""
+    logger.info(f"[API] 接收到删除短链接请求: code={code}")
+    try:
+        # 获取用户ID
+        user_id = get_user_id(request)
+        if not user_id:
+            logger.warning("[API] 删除短链接失败: 用户未登录")
+            raise HTTPException(status_code=401, detail="用户未登录")
+        
+        # 查询短链接
+        short_link = db.query(ShortLink).filter(ShortLink.code == code).first()
+        if not short_link:
+            logger.warning(f"[API] 删除短链接失败: 短链接不存在, code={code}")
+            raise HTTPException(status_code=404, detail="短链接不存在")
+        
+        # 检查权限（验证是否是该用户创建的短链接）
+        # 查找关联的图片
+        image = db.query(Image).filter(Image.filename == short_link.target_file).first()
+        if image and image.user_id != user_id:
+            logger.warning(f"[API] 用户({user_id})尝试删除其他用户({image.user_id})的短链接: {code}")
+            raise HTTPException(status_code=403, detail="无权删除其他用户的短链接")
+        
+        # 删除短链接
+        db.delete(short_link)
+        db.commit()
+        logger.info(f"[API] 短链接已删除: code={code}, user_id={user_id}")
+        
+        return {"success": True, "message": "短链接已成功删除"}
+    except HTTPException:
+        # 传递HTTP异常
+        raise
+    except Exception as e:
+        logger.error(f"[API] 删除短链接时出错: {str(e)}", exc_info=True)
+        db.rollback()
+        raise HTTPException(status_code=500, detail=f"删除短链接时出错: {str(e)}")

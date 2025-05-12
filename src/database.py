@@ -133,141 +133,164 @@ def upgrade_database():
         # 记录已添加的列
         added_columns = []
         
-        # 尝试添加upload_ip列到images表
-        try:
-            sql = "ALTER TABLE images ADD COLUMN upload_ip TEXT;"
-            cursor.execute(sql)
-            added_columns.append("images.upload_ip")
-            logger.info("成功添加 upload_ip 列到 images 表")
-        except sqlite3.OperationalError as e:
-            if "duplicate column name" not in str(e).lower():
-                logger.warning(f"无法添加 upload_ip 列到 images 表: {str(e)}")
-                
-        # 尝试添加file_size列到images表
-        try:
-            sql = "ALTER TABLE images ADD COLUMN file_size FLOAT;"
-            cursor.execute(sql)
-            added_columns.append("images.file_size")
-            logger.info("成功添加 file_size 列到 images 表")
-        except sqlite3.OperationalError as e:
-            if "duplicate column name" not in str(e).lower():
-                logger.warning(f"无法添加 file_size 列到 images 表: {str(e)}")
+        # 检查images表是否存在
+        cursor.execute("SELECT name FROM sqlite_master WHERE type='table' AND name='images';")
+        if not cursor.fetchone():
+            # images表不存在，创建表
+            logger.info("images表不存在，创建新表")
+            cursor.execute("""
+                CREATE TABLE images (
+                    id INTEGER PRIMARY KEY AUTOINCREMENT,
+                    filename TEXT UNIQUE,
+                    original_filename TEXT,
+                    file_size FLOAT,
+                    upload_time TIMESTAMP DEFAULT CURRENT_TIMESTAMP,
+                    upload_ip TEXT,
+                    user_id TEXT,
+                    mime_type TEXT DEFAULT 'image/jpeg',
+                    width INTEGER,
+                    height INTEGER,
+                    description TEXT
+                )
+            """)
+            cursor.execute("CREATE INDEX idx_images_filename ON images(filename);")
+            cursor.execute("CREATE INDEX idx_images_user_id ON images(user_id);")
+            added_columns.append("创建images表")
+        else:
+            # 获取images表的列信息
+            cursor.execute("PRAGMA table_info(images);")
+            existing_columns = [column[1] for column in cursor.fetchall()]
+            
+            # 需要检查的列
+            columns_to_check = {
+                "upload_ip": "TEXT",
+                "file_size": "FLOAT",
+                "width": "INTEGER",
+                "height": "INTEGER",
+                "description": "TEXT",
+                "user_id": "TEXT",
+                "mime_type": "TEXT DEFAULT 'image/jpeg'"
+            }
+            
+            # 检查并添加缺失的列
+            for col_name, col_type in columns_to_check.items():
+                if col_name not in existing_columns:
+                    try:
+                        sql = f"ALTER TABLE images ADD COLUMN {col_name} {col_type};"
+                        cursor.execute(sql)
+                        added_columns.append(f"images.{col_name}")
+                        logger.info(f"成功添加 {col_name} 列到 images 表")
+                    except sqlite3.OperationalError as e:
+                        if "duplicate column name" not in str(e).lower():
+                            logger.warning(f"无法添加 {col_name} 列到 images 表: {str(e)}")
         
-        # 尝试添加width列到images表
-        try:
-            sql = "ALTER TABLE images ADD COLUMN width INTEGER;"
-            cursor.execute(sql)
-            added_columns.append("images.width")
-            logger.info("成功添加 width 列到 images 表")
-        except sqlite3.OperationalError as e:
-            if "duplicate column name" not in str(e).lower():
-                logger.warning(f"无法添加 width 列到 images 表: {str(e)}")
-                
-        # 尝试添加height列到images表
-        try:
-            sql = "ALTER TABLE images ADD COLUMN height INTEGER;"
-            cursor.execute(sql)
-            added_columns.append("images.height")
-            logger.info("成功添加 height 列到 images 表")
-        except sqlite3.OperationalError as e:
-            if "duplicate column name" not in str(e).lower():
-                logger.warning(f"无法添加 height 列到 images 表: {str(e)}")
-                
-        # 尝试添加description列到images表
-        try:
-            sql = "ALTER TABLE images ADD COLUMN description TEXT;"
-            cursor.execute(sql)
-            added_columns.append("images.description")
-            logger.info("成功添加 description 列到 images 表")
-        except sqlite3.OperationalError as e:
-            if "duplicate column name" not in str(e).lower():
-                logger.warning(f"无法添加 description 列到 images 表: {str(e)}")
+        # 检查short_links表是否存在
+        cursor.execute("SELECT name FROM sqlite_master WHERE type='table' AND name='short_links';")
+        if not cursor.fetchone():
+            # short_links表不存在，创建表
+            logger.info("short_links表不存在，创建新表")
+            cursor.execute("""
+                CREATE TABLE short_links (
+                    id INTEGER PRIMARY KEY AUTOINCREMENT,
+                    code TEXT UNIQUE,
+                    target_file TEXT,
+                    created_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP,
+                    access_count INTEGER DEFAULT 0,
+                    expire_at TIMESTAMP,
+                    is_enabled BOOLEAN DEFAULT 1,
+                    user_id TEXT
+                )
+            """)
+            cursor.execute("CREATE INDEX idx_short_links_code ON short_links(code);")
+            cursor.execute("CREATE INDEX idx_short_links_target_file ON short_links(target_file);")
+            cursor.execute("CREATE INDEX idx_short_links_user_id ON short_links(user_id);")
+            added_columns.append("创建short_links表")
+        else:
+            # 获取short_links表的列信息
+            cursor.execute("PRAGMA table_info(short_links);")
+            existing_columns = [column[1] for column in cursor.fetchall()]
+            
+            # 需要检查的列
+            columns_to_check = {
+                "is_enabled": "BOOLEAN DEFAULT 1",
+                "user_id": "TEXT",
+                "access_count": "INTEGER DEFAULT 0",
+                "expire_at": "TIMESTAMP"
+            }
+            
+            # 检查并添加缺失的列
+            for col_name, col_type in columns_to_check.items():
+                if col_name not in existing_columns:
+                    try:
+                        sql = f"ALTER TABLE short_links ADD COLUMN {col_name} {col_type};"
+                        cursor.execute(sql)
+                        added_columns.append(f"short_links.{col_name}")
+                        logger.info(f"成功添加 {col_name} 列到 short_links 表")
+                    except sqlite3.OperationalError as e:
+                        if "duplicate column name" not in str(e).lower():
+                            logger.warning(f"无法添加 {col_name} 列到 short_links 表: {str(e)}")
         
-        # 尝试添加user_id列到images表
-        try:
-            sql = "ALTER TABLE images ADD COLUMN user_id TEXT;"
-            cursor.execute(sql)
-            added_columns.append("images.user_id")
-            logger.info("成功添加 user_id 列到 images 表")
-        except sqlite3.OperationalError as e:
-            if "duplicate column name" not in str(e).lower():
-                logger.warning(f"无法添加 user_id 列到 images 表: {str(e)}")
+        # 检查upload_logs表是否存在
+        cursor.execute("SELECT name FROM sqlite_master WHERE type='table' AND name='upload_logs';")
+        if not cursor.fetchone():
+            # upload_logs表不存在，创建表
+            logger.info("upload_logs表不存在，创建新表")
+            cursor.execute("""
+                CREATE TABLE upload_logs (
+                    id INTEGER PRIMARY KEY AUTOINCREMENT,
+                    original_filename TEXT,
+                    saved_filename TEXT,
+                    status TEXT,
+                    file_size FLOAT,
+                    error_message TEXT,
+                    upload_time TIMESTAMP DEFAULT CURRENT_TIMESTAMP,
+                    ip_address TEXT,
+                    user_agent TEXT,
+                    user_id TEXT
+                )
+            """)
+            cursor.execute("CREATE INDEX idx_upload_logs_user_id ON upload_logs(user_id);")
+            added_columns.append("创建upload_logs表")
+        else:
+            # 获取upload_logs表的列信息
+            cursor.execute("PRAGMA table_info(upload_logs);")
+            existing_columns = [column[1] for column in cursor.fetchall()]
+            
+            # 需要检查的列
+            columns_to_check = {
+                "saved_filename": "TEXT",
+                "file_size": "FLOAT",
+                "user_id": "TEXT",
+                "user_agent": "TEXT"
+            }
+            
+            # 检查并添加缺失的列
+            for col_name, col_type in columns_to_check.items():
+                if col_name not in existing_columns:
+                    try:
+                        sql = f"ALTER TABLE upload_logs ADD COLUMN {col_name} {col_type};"
+                        cursor.execute(sql)
+                        added_columns.append(f"upload_logs.{col_name}")
+                        logger.info(f"成功添加 {col_name} 列到 upload_logs 表")
+                    except sqlite3.OperationalError as e:
+                        if "duplicate column name" not in str(e).lower():
+                            logger.warning(f"无法添加 {col_name} 列到 upload_logs 表: {str(e)}")
         
-        # 尝试添加is_enabled列到short_links表
-        try:
-            sql = "ALTER TABLE short_links ADD COLUMN is_enabled BOOLEAN DEFAULT 1;"
-            cursor.execute(sql)
-            added_columns.append("short_links.is_enabled")
-            logger.info("成功添加 is_enabled 列到 short_links 表")
-        except sqlite3.OperationalError as e:
-            if "duplicate column name" not in str(e).lower():
-                logger.warning(f"无法添加 is_enabled 列到 short_links 表: {str(e)}")
-        
-        # 尝试添加user_id列到short_links表
-        try:
-            sql = "ALTER TABLE short_links ADD COLUMN user_id TEXT;"
-            cursor.execute(sql)
-            added_columns.append("short_links.user_id")
-            logger.info("成功添加 user_id 列到 short_links 表")
-        except sqlite3.OperationalError as e:
-            if "duplicate column name" not in str(e).lower():
-                logger.warning(f"无法添加 user_id 列到 short_links 表: {str(e)}")
-        
-        # 尝试添加saved_filename列到upload_logs表
-        try:
-            sql = "ALTER TABLE upload_logs ADD COLUMN saved_filename TEXT;"
-            cursor.execute(sql)
-            added_columns.append("upload_logs.saved_filename")
-            logger.info("成功添加 saved_filename 列到 upload_logs 表")
-        except sqlite3.OperationalError as e:
-            if "duplicate column name" not in str(e).lower():
-                logger.warning(f"无法添加 saved_filename 列到 upload_logs 表: {str(e)}")
-        
-        # 尝试添加file_size列到upload_logs表
-        try:
-            sql = "ALTER TABLE upload_logs ADD COLUMN file_size FLOAT;"
-            cursor.execute(sql)
-            added_columns.append("upload_logs.file_size")
-            logger.info("成功添加 file_size 列到 upload_logs 表")
-        except sqlite3.OperationalError as e:
-            if "duplicate column name" not in str(e).lower():
-                logger.warning(f"无法添加 file_size 列到 upload_logs 表: {str(e)}")
-        
-        # 尝试添加user_id列到upload_logs表
-        try:
-            sql = "ALTER TABLE upload_logs ADD COLUMN user_id TEXT;"
-            cursor.execute(sql)
-            added_columns.append("upload_logs.user_id")
-            logger.info("成功添加 user_id 列到 upload_logs 表")
-        except sqlite3.OperationalError as e:
-            if "duplicate column name" not in str(e).lower():
-                logger.warning(f"无法添加 user_id 列到 upload_logs 表: {str(e)}")
-        
-        # 尝试添加索引到user_id列
-        try:
-            # 每个单独执行，避免一个失败影响其他的
-            cursor.execute("CREATE INDEX IF NOT EXISTS idx_images_user_id ON images(user_id);")
-            cursor.execute("CREATE INDEX IF NOT EXISTS idx_upload_logs_user_id ON upload_logs(user_id);")
-            cursor.execute("CREATE INDEX IF NOT EXISTS idx_short_links_user_id ON short_links(user_id);")
-            added_columns.append("user_id索引")
-            logger.info("成功创建 user_id 索引")
-        except sqlite3.OperationalError as e:
-            logger.warning(f"无法创建user_id索引: {str(e)}")
-        
-        # 提交更改
+        # 提交所有更改
         conn.commit()
+        
+        # 添加详细日志信息
+        if added_columns:
+            logger.info(f"数据库升级完成，添加了以下列: {', '.join(added_columns)}")
+        else:
+            logger.info("数据库结构已是最新，无需升级")
+        
+        # 关闭连接
         conn.close()
         
-        # 只在有新增列时输出日志
-        if added_columns:
-            logger.info(f"✓ 数据库升级完成，已添加列: {', '.join(added_columns)}")
-        else:
-            logger.warning("数据库升级完成，未添加新列")
-            
-        return True
     except Exception as e:
-        logger.error(f"数据库升级失败: {str(e)}")
-        return False
+        logger.error(f"数据库升级失败: {str(e)}", exc_info=True)
+        raise
 
 # 获取数据库会话
 def get_db():

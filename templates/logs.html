@@ -347,7 +347,7 @@
                         <tr>
                             <td>{{ log.upload_time.strftime('%Y-%m-%d %H:%M:%S') }}</td>
                             <td>{{ log.original_filename }}</td>
-                            <td>{% if log.size %}{{ "%.2f"|format(log.size) }} KB{% else %}—{% endif %}</td>
+                            <td>{% if log.file_size %}{{ "%.2f"|format(log.file_size) }} KB{% else %}—{% endif %}</td>
                             <td class="{% if log.status == 'success' %}success{% elif log.status == 'failed' %}failed{% elif log.status == 'deleted' %}deleted{% endif %}">
                                 {{ log.status }}
                                 {% if log.error_message %}

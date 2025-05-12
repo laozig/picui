@@ -1,0 +1,34 @@
+{
+  "sessions": {
+    "tUwRI0w3LNG44wFRuk3Alb41kU5mV-rWq0g9CtCuaZw": {
+      "user_id": "6adbe5ac-467f-45d1-b88b-bbf6dc58b91a",
+      "created_at": 1747023533.6418316,
+      "last_accessed": 1747023533.6418316,
+      "ip_address": "127.0.0.1"
+    },
+    "gb4X-MgtNbCWRM1i8UhNMEDWIc5bSWM2gBrozbQenD0": {
+      "user_id": "b0df12a7-35c7-41ef-ba8b-e22d1602c29a",
+      "created_at": 1747023557.3148196,
+      "last_accessed": 1747023557.3148196,
+      "ip_address": "127.0.0.1"
+    },
+    "PM0pd_KzSyWhUac4FJP4tCyyzOsUmttx7szsR-B1AHY": {
+      "user_id": "e66b7340-4337-4b1a-b87b-0b6a779b203c",
+      "created_at": 1747023580.2221365,
+      "last_accessed": 1747023580.2221365,
+      "ip_address": "127.0.0.1"
+    },
+    "sNgvcLUY_WMeuJ-OqKiuZH6997-PWnetbYtc6h8JVMs": {
+      "user_id": "fd7913fe-3339-4d11-91db-5655fc84a96f",
+      "created_at": 1747023582.1431117,
+      "last_accessed": 1747023582.1431117,
+      "ip_address": "127.0.0.1"
+    }
+  },
+  "user_sessions": {
+    "6adbe5ac-467f-45d1-b88b-bbf6dc58b91a": "tUwRI0w3LNG44wFRuk3Alb41kU5mV-rWq0g9CtCuaZw",
+    "b0df12a7-35c7-41ef-ba8b-e22d1602c29a": "gb4X-MgtNbCWRM1i8UhNMEDWIc5bSWM2gBrozbQenD0",
+    "e66b7340-4337-4b1a-b87b-0b6a779b203c": "PM0pd_KzSyWhUac4FJP4tCyyzOsUmttx7szsR-B1AHY",
+    "fd7913fe-3339-4d11-91db-5655fc84a96f": "sNgvcLUY_WMeuJ-OqKiuZH6997-PWnetbYtc6h8JVMs"
+  }
+}

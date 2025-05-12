@@ -249,7 +249,7 @@ PicUI使用会话Cookie进行用户身份识别，主要特点：
 3. 上传图片、创建短链接等功能都有完善的错误处理机制
 4. 在迁移到新版本时不需要手动修改数据库结构
 
-### 已修复的数据库问题
+## 已修复的数据库问题
 
 - `images`表缺少`file_size`、`upload_ip`、`width`、`height`和`description`列，现已自动添加
 - `upload_logs`表缺少`saved_filename`和`file_size`列，现已自动添加
@@ -263,12 +263,28 @@ PicUI使用会话Cookie进行用户身份识别，主要特点：
 python -c "from src.database import upgrade_database; upgrade_database()"
 ```
 
+## 项目文件结构优化
+
+最近的优化更新：
+
+1. 移除了冗余的静态HTML文件：
+   - 删除了`static/index.html`和`static/admin.html`，使用`templates`目录下的模板文件作为唯一来源
+   - 保留了`static/forbidden.html`作为403错误页面
+   
+2. 项目文件结构更加清晰：
+   - `templates/`目录：包含所有Jinja2模板文件（index.html, admin.html, logs.html, short_links.html）
+   - `static/`目录：包含静态资源和错误页面
+   - `src/`目录：包含所有Python源代码
+   - `uploads/`目录：存储上传的图片文件
+
+这些优化使项目结构更加清晰，减少了维护的复杂性。
+
 ## 代码清理与优化
 
 项目已进行以下优化：
 
 - 删除了临时修复脚本 (`fix_db.py`, `fix_type.py`, `fix_width_height.py`)
-- 删除了数据库检查脚本 (`check_db.py`, `check_db_structure.py`) 
+- 删除了数据库检查脚本 (`check_db.py`) 
 - 删除了测试文件 (`test_db_upgrade.py`)
 - 合并了重复的运行脚本，统一使用 `main.py`
 - 移除了多余的日志文件
@@ -291,6 +307,10 @@ python -c "from src.database import upgrade_database; upgrade_database()"
   - 图片上传现在自动生成短链接，有效期默认为3天
   - 清理了项目代码，移除了未使用的修复脚本和测试文件
   - 更新了.gitignore文件，更好地忽略临时文件和数据库备份
+  
+- **2024.05.20**:
+  - 删除了冗余的静态HTML文件，减少了代码重复
+  - 优化了项目文件结构，提高了维护性
 
 ## API接口
 

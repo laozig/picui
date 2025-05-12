@@ -68,7 +68,8 @@ DISK_USAGE_THRESHOLD = float(os.getenv("DISK_USAGE_THRESHOLD", 80.0))  # 默认�
 UPLOAD_DIR = os.getenv("UPLOAD_DIR", "uploads")
 PORT = int(os.getenv("PORT", 8000))
 HOST = os.getenv("HOST", "0.0.0.0")
-BASE_URL = os.getenv("BASE_URL", f"http://localhost:{PORT}")
+# 如果未设置BASE_URL，将使用当前请求的URL作为基础URL，而不是写死localhost
+BASE_URL = os.getenv("BASE_URL", "")  # 默认不指定，将会使用请求中的host
 SESSION_CLEANUP_INTERVAL = int(os.getenv("SESSION_CLEANUP_INTERVAL", 3600))  # 默认每小时清理一次会话
 
 # 设置Prometheus指标

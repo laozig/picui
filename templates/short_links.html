@@ -250,22 +250,27 @@
                     method: 'DELETE',
                     headers: {
                         'Content-Type': 'application/json',
-                    }
+                        'Accept': 'application/json',
+                        'X-Requested-With': 'XMLHttpRequest'
+                    },
+                    credentials: 'same-origin',
                 })
                 .then(response => {
                     if (response.ok) {
                         return response.json();
                     }
-                    throw new Error('删除失败');
+                    throw new Error(`删除失败: ${response.status} ${response.statusText}`);
                 })
                 .then(data => {
                     console.log('删除成功:', data);
+                    // 显示成功消息
+                    alert('短链接已成功删除');
                     // 刷新页面
                     window.location.reload();
                 })
                 .catch(error => {
                     console.error('错误:', error);
-                    alert('删除短链接时出错');
+                    alert(`删除短链接时出错: ${error.message}`);
                 })
                 .finally(() => {
                     modal.classList.add('hidden');
