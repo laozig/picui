@@ -40,21 +40,27 @@ coverage.xml
 picui_backup_*.db  # 数据库备份文件
 *.db.bak
 *.db-journal
+*.bak.db
 
 # 上传的文件
 uploads/*
 !uploads/.gitkeep
 temp/*
 !temp/.gitkeep
+media/
+images/
 
 # 日志
 *.log
-*.log.bak
+*.log.*
 logs/
 log/
+*.log.bak
+*.log.gz
 
 # 环境变量
 .env
+.env.*
 .env.local
 .env.development.local
 .env.test.local
@@ -71,6 +77,11 @@ log/
 .settings/
 *.sublime-workspace
 *.sublime-project
+.spyderproject
+.spyproject
+nbproject/
+.vs/
+*.code-workspace
 
 # 系统文件
 .DS_Store
@@ -79,12 +90,17 @@ desktop.ini
 ~$*
 *.tmp
 *.bak
+ehthumbs.db
+Icon?
+*.lnk
 
 # 临时文件
 *.tmp
 *.temp
 .tmp/
 .temp/
+tmp/
+temp/
 
 # PicUI特定
 picui.db-journal
@@ -94,9 +110,13 @@ check_*.py  # 检查脚本
 *_backup_*.db  # 备份数据库文件
 *.html.bak  # HTML备份文件
 static/*.html.bak  # 静态HTML备份文件
+sessions.json  # 会话文件
+sessions_backup_*.json  # 会话备份文件
 
 # Docker
 .dockerignore
+.docker/
+docker-compose.override.yml
 
 # 测试文件
 test_*.py
@@ -135,6 +155,16 @@ coverage/
 # 部署相关
 deploy/credentials/
 deploy/secrets/
+.vercel
+.netlify
+.serverless/
+.now/
+.terraform/
+cloudformation/
+
+# GitHub 相关
+.github/*
+!.github/workflows/
 
 # 编译产物
 *.pyc
@@ -145,4 +175,22 @@ __pycache__/
 *.h
 *.dll
 *.so
-*.dylib 
+*.dylib
+*.out
+*.o
+*.a
+
+# 前端构建
+node_modules/
+npm-debug.log
+yarn-error.log
+yarn-debug.log
+.pnpm-debug.log
+package-lock.json
+yarn.lock
+
+# 文档生成
+/site
+/docs/_build/
+/docs/api/
+/docs/reference/ 
