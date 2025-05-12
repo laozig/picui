@@ -428,17 +428,17 @@ async def upload_image(
                         base_url = BASE_URL
                     access_url = f"{base_url}/images/{filename}"
                 
-                # 自动生成短链接 (设置为3天有效期)
+                # 自动生成短链接 (永久有效)
                 short_url = None
                 try:
                     logger.info(f"为上传图片自动生成短链接: {filename}")
                     # 查询刚刚插入的图片ID
                     image = db.query(Image).filter(Image.filename == filename).first()
                     if image:
-                        # 生成短链接 (3天 = 4320分钟)
+                        # 生成短链接 (永久有效)
                         code = generate_short_link(
                             filename=filename,
-                            expire_minutes=4320,  # 3天有效期
+                            expire_minutes=None,  # 永久有效
                             db=db,
                             user_id=user_id
                         )
