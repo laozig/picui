@@ -1,4 +1,4 @@
-from fastapi import APIRouter, Depends, HTTPException, Request, Query, File, UploadFile
+from fastapi import APIRouter, Depends, HTTPException, Request, Query, File, UploadFile, Response
 from fastapi.responses import FileResponse, HTMLResponse, RedirectResponse, StreamingResponse
 from sqlalchemy.orm import Session
 from sqlalchemy.sql import func
@@ -20,6 +20,7 @@ from src.utils import (
     allowed_file, optimize_image, offline_image_check, 
     add_watermark, check_disk_usage, ALLOWED_EXTENSIONS
 )
+from src.session import get_or_create_session, get_user_id
 
 # 配置日志
 logger = logging.getLogger("picui")
@@ -99,7 +100,7 @@ def schedule_request_counter_cleanup():
 schedule_request_counter_cleanup()
 
 # 为图片生成短链接
-def generate_short_link(filename, expire_minutes=None, db=None):
+def generate_short_link(filename, expire_minutes=None, db=None, user_id=None):
     """
     为图片生成短链接
     
@@ -107,6 +108,7 @@ def generate_short_link(filename, expire_minutes=None, db=None):
     - filename: 图片文件名
     - expire_minutes: 过期时间（分钟）
     - db: 数据库会话
+    - user_id: 用户ID
     
     返回:
     - 短链接编码
@@ -128,7 +130,8 @@ def generate_short_link(filename, expire_minutes=None, db=None):
     short_link = ShortLink(
         code=code,
         target_file=filename,
-        expire_at=expire_at
+        expire_at=expire_at,
+        user_id=user_id  # 添加用户ID
     )
     
     db.add(short_link)
@@ -151,6 +154,7 @@ async def process_image(file_location: str, original_filename: str, client_ip: s
         
         # 如果启用了离线检测，在线程池中执行检测
         if OFFLINE_CHECK_ENABLED:
+            logger.info(f"执行图片内容检测: {file_location}")
             is_safe = await loop.run_in_executor(
                 thread_pool, 
                 lambda: offline_image_check(file_location, SKIN_THRESHOLD)
@@ -171,7 +175,10 @@ async def process_image(file_location: str, original_filename: str, client_ip: s
                 db.add(log_entry)
                 db.commit()
                 
+                logger.warning(f"图片内容不符合规范，已被拒绝: {file_location}")
                 return False
+            
+            logger.info("✓ 图片内容检测通过: {file_location}")
         
         return True
     except Exception as e:
@@ -183,9 +190,13 @@ async def process_image(file_location: str, original_filename: str, client_ip: s
 async def upload_image(
     file: Union[UploadFile, List[UploadFile]] = File(..., description="要上传的图片文件"), 
     db: Session = Depends(get_db), 
-    request: Request = None
+    request: Request = None,
+    response: Response = None
 ):
     """上传图片并返回访问URL"""
+    # 获取或创建会话
+    _, user_id = get_or_create_session(request, response)
+    
     # 检查是否是多文件上传
     is_multiple = isinstance(file, list)
     files = file if is_multiple else [file]
@@ -198,111 +209,136 @@ async def upload_image(
         client_ip = request.client.host if request else "unknown"
         user_agent = request.headers.get("user-agent", "unknown")
         
+        # 检查文件类型是否符合要求
+        original_filename = single_file.filename
+        if not allowed_file(original_filename):
+            error_message = f"不支持的文件类型: {original_filename}"
+            logger.warning(f"{error_message}")
+            errors.append({"file": original_filename, "error": error_message})
+            continue
+        
+        # 检查文件大小
+        file_size = await single_file.read(MAX_SIZE + 1)  # 读取比最大限制多1字节，用于检测是否超过限制
+        if len(file_size) > MAX_SIZE:
+            error_message = f"文件大小超过限制 ({len(file_size) / 1024 / 1024:.1f}MB > {MAX_SIZE / 1024 / 1024:.1f}MB)"
+            logger.warning(f"{error_message}: {original_filename}")
+            errors.append({"file": original_filename, "error": error_message})
+            continue
+        
+        # 重置文件指针
+        await single_file.seek(0)
+        
+        # 生成唯一文件名，保留原始扩展名
+        file_extension = os.path.splitext(original_filename)[1].lower()
+        filename = f"{uuid.uuid4().hex}{file_extension}"
+        file_location = os.path.join(UPLOAD_DIR, filename)
+        
         try:
-            # 检查图片类型
-            if not allowed_file(single_file.filename):
-                logger.warning(f"不支持的文件类型: {single_file.filename}")
-                errors.append(f"不支持的图片格式: {single_file.filename}")
-                continue
-            
-            # 生成安全文件名
-            original_filename = single_file.filename
-            ext = os.path.splitext(original_filename)[1].lower()
-            random_filename = f"{uuid.uuid4().hex}{ext}"
-            
-            # 确保上传目录存在
-            os.makedirs(UPLOAD_DIR, exist_ok=True)
-            
-            # 保存图片
-            file_location = os.path.join(UPLOAD_DIR, random_filename)
-            
-            # 边读取边写入以节省内存
-            with open(file_location, "wb") as buffer:
-                while True:
-                    chunk = await single_file.read(8192)  # 每次读取8K
-                    if not chunk:
-                        break
-                    buffer.write(chunk)
-            
-            logger.info(f"图片已保存: {file_location}")
-            
-            # 处理图片(检查、优化、存储信息)
-            img_processing_succeeded = await process_image(
-                file_location, 
-                original_filename, 
-                client_ip, 
-                user_agent, 
-                db
-            )
-            
-            if not img_processing_succeeded:
-                errors.append(f"图片处理失败: {original_filename}")
-                # 删除图片文件
+            # 限制并发上传数
+            async with upload_semaphore:
+                # 确保目录存在
+                os.makedirs(UPLOAD_DIR, exist_ok=True)
+                
+                # 写入文件
+                logger.info(f"正在保存文件: {original_filename} → {filename}")
+                with open(file_location, "wb+") as file_object:
+                    file_object.write(file_size)
+                
+                # 异步处理图片（优化尺寸和内容检测）
+                if not await process_image(file_location, original_filename, client_ip, user_agent, db):
+                    errors.append({"file": original_filename, "error": "图片处理失败"})
+                    continue
+                
+                # 获取文件大小
+                file_size_kb = os.path.getsize(file_location) / 1024
+                
+                # 保存图片记录到数据库
+                img = Image(
+                    filename=filename,
+                    original_filename=original_filename,
+                    file_size=file_size_kb,
+                    upload_ip=client_ip,
+                    user_id=user_id  # 添加用户ID
+                )
+                db.add(img)
+                db.commit()
+                
+                # 记录上传成功日志
+                log_entry = UploadLog(
+                    original_filename=original_filename,
+                    status="success",
+                    file_size=file_size_kb,
+                    saved_filename=filename,
+                    ip_address=client_ip,
+                    user_agent=user_agent,
+                    user_id=user_id  # 添加用户ID
+                )
+                db.add(log_entry)
+                db.commit()
+                
+                # 生成访问URL
+                access_url = f"{BASE_URL}/images/{filename}"
+                
+                # 添加到结果列表
+                logger.info(f"✓ 文件上传成功: {filename} ({file_size_kb:.1f} KB)")
+                results.append({
+                    "url": access_url,
+                    "filename": filename,
+                    "original_filename": original_filename,
+                    "size": file_size_kb
+                })
+                
+        except Exception as e:
+            logger.error(f"文件上传处理异常: {str(e)}")
+            # 如果文件已创建但处理失败，删除文件
+            if os.path.exists(file_location):
                 try:
                     os.remove(file_location)
                 except:
                     pass
-                continue
             
-            # 读取图片信息
-            img_info = db.query(Image).filter(Image.filename == random_filename).first()
+            # 记录错误
+            errors.append({"file": original_filename, "error": str(e)})
             
-            # 为图片生成短链接
-            short_code = generate_short_link(random_filename, db=db)
-            
-            # 构建基础URL
-            if request:
-                base_url = f"{request.url.scheme}://{request.url.netloc}"
-            else:
-                base_url = BASE_URL
-            
-            # 构建URL
-            url = f"{base_url}/images/{random_filename}"
-            short_url = f"{base_url}/s/{short_code}"
-            
-            # 构建HTML和Markdown代码
-            html_code = f'<img src="{url}" alt="{original_filename}" />'
-            markdown_code = f'![{original_filename}]({url})'
-            
-            # 添加到结果
-            results.append({
-                "url": url,
-                "short_url": short_url,
-                "filename": random_filename,
-                "original_filename": original_filename,
-                "size": img_info.size_kb if img_info else 0,
-                "mime_type": img_info.mime_type if img_info else "image/jpeg",
-                "id": img_info.id if img_info else 0,
-                "html_code": html_code,
-                "markdown_code": markdown_code
-            })
-        except Exception as e:
-            logger.error(f"处理文件 {single_file.filename} 时出错: {str(e)}", exc_info=True)
-            errors.append(f"处理文件失败: {single_file.filename}")
+            # 记录上传失败日志
+            log_entry = UploadLog(
+                original_filename=original_filename,
+                status="failed",
+                error_message=str(e),
+                ip_address=client_ip,
+                user_agent=user_agent,
+                user_id=user_id  # 添加用户ID
+            )
+            db.add(log_entry)
+            db.commit()
     
-    # 处理返回结果
-    if len(results) == 0:
-        # 所有文件都处理失败
-        error_message = "上传失败: " + ", ".join(errors)
-        raise HTTPException(status_code=500, detail=error_message)
-    
-    # 如果只上传了一个文件且成功，返回单个结果
-    if not is_multiple and len(results) == 1:
+    # 返回结果
+    if is_multiple:
+        return {"success": len(results) > 0, "files": results, "errors": errors}
+    else:
+        # 单文件上传
+        if errors:
+            raise HTTPException(status_code=400, detail=errors[0]["error"])
         return results[0]
-    
-    # 否则返回结果数组
-    return results
 
 # 图片删除接口
 @router.delete("/img/{filename}", tags=["图片"], summary="删除图片", description="删除已上传的图片")
 async def delete_image(
     filename: str,
-    db: Session = Depends(get_db)
+    db: Session = Depends(get_db),
+    request: Request = None
 ):
+    # 获取用户ID
+    user_id = get_user_id(request)
+    
     # 检查图片是否存在
     image = db.query(Image).filter(Image.filename == filename).first()
     if not image:
         raise HTTPException(status_code=404, detail="图片不存在")
+    
+    # 检查是否是上传者本人
+    if user_id and image.user_id != user_id:
+        raise HTTPException(status_code=403, detail="您无权删除其他用户上传的图片")
     
     file_path = os.path.join(UPLOAD_DIR, filename)
     
@@ -490,18 +526,27 @@ async def create_temp_link(
     image_id: int,
     expire_minutes: int = Query(..., description="链接有效时间（分钟）", ge=1, le=10080),  # 最长7天
     request: Request = None,
+    response: Response = None,
     db: Session = Depends(get_db)
 ):
+    # 获取或创建会话
+    _, user_id = get_or_create_session(request, response)
+    
     # 查询图片
     image = db.query(Image).filter(Image.id == image_id).first()
     if not image:
         raise HTTPException(status_code=404, detail="图片不存在")
     
+    # 检查权限 - 只能为自己的图片创建外链
+    if user_id and image.user_id != user_id:
+        raise HTTPException(status_code=403, detail="您无权为其他用户的图片创建外链")
+    
     # 创建临时短链接
     code = generate_short_link(
         filename=image.filename,
         expire_minutes=expire_minutes,
-        db=db
+        db=db,
+        user_id=user_id
     )
     
     # 生成完整URL

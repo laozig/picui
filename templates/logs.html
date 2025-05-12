@@ -313,63 +313,78 @@
         </div>
     </header>
     
-    <div class="container">
-        <div class="card">
-            <a href="/" class="btn">返回主页</a>
-            <a href="/admin/short-links" class="btn">短链管理</a>
-            
-            <table>
-                <thead>
-                    <tr>
-                        <th>时间</th>
-                        <th>原始文件名</th>
-                        <th>文件大小</th>
-                        <th>状态</th>
-                        <th>IP地址</th>
-                    </tr>
-                </thead>
-                <tbody>
-                    {% for log in logs %}
-                    <tr>
-                        <td>{{ log.upload_time.strftime('%Y-%m-%d %H:%M:%S') }}</td>
-                        <td>{{ log.original_filename }}</td>
-                        <td>{% if log.size %}{{ "%.2f"|format(log.size) }} KB{% else %}—{% endif %}</td>
-                        <td class="{% if log.status == 'success' %}success{% elif log.status == 'failed' %}failed{% elif log.status == 'deleted' %}deleted{% endif %}">
-                            {{ log.status }}
-                            {% if log.error_message %}
-                            <span title="{{ log.error_message }}">⚠️</span>
-                            {% endif %}
-                        </td>
-                        <td>{{ log.ip_address }}</td>
-                    </tr>
+    <div class="container mx-auto px-4 py-8">
+        <div class="flex justify-between items-center mb-6">
+            <h1 class="text-2xl font-bold text-gray-800">上传日志</h1>
+            <a href="/" class="bg-blue-500 hover:bg-blue-600 text-white py-2 px-4 rounded">
+                <i class="fas fa-home mr-2"></i>返回首页
+            </a>
+        </div>
+
+        <!-- 提示信息 -->
+        <div class="mb-6 bg-blue-100 border-l-4 border-blue-500 text-blue-700 p-4" role="alert">
+            <p class="font-bold">提示</p>
+            <p>为保护隐私，此页面仅显示您账户下的上传日志记录。系统使用会话Cookie来识别您的身份。</p>
+        </div>
+
+        <div class="bg-white rounded-lg shadow-md overflow-hidden">
+            <div class="card">
+                <a href="/" class="btn">返回主页</a>
+                <a href="/admin/short-links" class="btn">短链管理</a>
+                
+                <table>
+                    <thead>
+                        <tr>
+                            <th>时间</th>
+                            <th>原始文件名</th>
+                            <th>文件大小</th>
+                            <th>状态</th>
+                            <th>IP地址</th>
+                        </tr>
+                    </thead>
+                    <tbody>
+                        {% for log in logs %}
+                        <tr>
+                            <td>{{ log.upload_time.strftime('%Y-%m-%d %H:%M:%S') }}</td>
+                            <td>{{ log.original_filename }}</td>
+                            <td>{% if log.size %}{{ "%.2f"|format(log.size) }} KB{% else %}—{% endif %}</td>
+                            <td class="{% if log.status == 'success' %}success{% elif log.status == 'failed' %}failed{% elif log.status == 'deleted' %}deleted{% endif %}">
+                                {{ log.status }}
+                                {% if log.error_message %}
+                                <span title="{{ log.error_message }}">⚠️</span>
+                                {% endif %}
+                            </td>
+                            <td>{{ log.ip_address }}</td>
+                        </tr>
+                        {% endfor %}
+                    </tbody>
+                </table>
+                
+                <!-- 分页 -->
+                {% if total_pages > 1 %}
+                <ul class="pagination">
+                    <li class="{% if page == 1 %}disabled{% endif %}">
+                        <a href="?page=1">首页</a>
+                    </li>
+                    <li class="{% if page == 1 %}disabled{% endif %}">
+                        <a href="?page={{ page - 1 if page > 1 else 1 }}">上一页</a>
+                    </li>
+                    
+                    {% for i in range(max(1, page - 2), min(total_pages + 1, page + 3)) %}
+                    <li class="{% if i == page %}active{% endif %}">
+                        <a href="?page={{ i }}">{{ i }}</a>
+                    </li>
                     {% endfor %}
-                </tbody>
-            </table>
-            
-            <!-- 分页 -->
-            {% if total_pages > 1 %}
-            <ul class="pagination">
-                <li class="{% if page == 1 %}disabled{% endif %}">
-                    <a href="?page=1">首页</a>
-                </li>
-                <li class="{% if page == 1 %}disabled{% endif %}">
-                    <a href="?page={{ page - 1 if page > 1 else 1 }}">上一页</a>
-                </li>
-                
-                {% for i in range(max(1, page - 2), min(total_pages + 1, page + 3)) %}
-                <li class="{% if i == page %}active{% endif %}">
-                    <a href="?page={{ i }}">{{ i }}</a>
-                </li>
-                {% endfor %}
-                
-                <li class="{% if page == total_pages %}disabled{% endif %}">
-                    <a href="?page={{ page + 1 if page < total_pages else total_pages }}">下一页</a>
-                </li>
-                <li class="{% if page == total_pages %}disabled{% endif %}">
-                    <a href="?page={{ total_pages }}">末页</a>
-                </li>
-            </ul>
-            {% endif %}
+                    
+                    <li class="{% if page == total_pages %}disabled{% endif %}">
+                        <a href="?page={{ page + 1 if page < total_pages else total_pages }}">下一页</a>
+                    </li>
+                    <li class="{% if page == total_pages %}disabled{% endif %}">
+                        <a href="?page={{ total_pages }}">末页</a>
+                    </li>
+                </ul>
+                {% endif %}
+            </div>
         </div>
     </div>
     

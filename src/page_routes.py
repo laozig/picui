@@ -1,10 +1,15 @@
-from fastapi import APIRouter, Depends, Request, Query
+from fastapi import APIRouter, Depends, Request, Response, Query
 from fastapi.responses import HTMLResponse
 from sqlalchemy.orm import Session
 from sqlalchemy.sql import func
 from datetime import datetime
+import logging
 
 from src.database import get_db, ShortLink, UploadLog, Image
+from src.session import get_or_create_session, get_user_id
+
+# 配置日志
+logger = logging.getLogger("picui")
 
 # 创建路由器
 router = APIRouter()
@@ -19,30 +24,55 @@ def set_templates(template_instance):
 
 # 主页路由
 @router.get("/", tags=["页面"], summary="主页", description="PicUI图床服务主页")
-async def home(request: Request):
-    """渲染主页模板"""
-    return templates.TemplateResponse(
-        "index.html",
-        {"request": request}
-    )
+async def home(request: Request, response: Response):
+    """渲染主页模板，同时确保用户有会话Cookie"""
+    try:
+        # 获取或创建会话
+        _, user_id = get_or_create_session(request, response)
+        logger.info(f"用户访问主页: user_id={user_id}")
+        
+        return templates.TemplateResponse(
+            "index.html",
+            {"request": request}
+        )
+    except Exception as e:
+        logger.error(f"主页访问出错: {str(e)}", exc_info=True)
+        # 返回简单的错误页面
+        return HTMLResponse(
+            content=f"""
+            <html>
+                <head><title>发生错误</title></head>
+                <body>
+                    <h1>访问出错</h1>
+                    <p>系统在处理您的请求时遇到了问题。错误信息: {str(e)}</p>
+                    <a href="/">刷新重试</a>
+                </body>
+            </html>
+            """,
+            status_code=500
+        )
 
 # 查看上传日志页面
 @router.get("/logs/", response_class=HTMLResponse, tags=["页面"], summary="上传日志", description="查看上传日志页面")
 async def view_logs(
     request: Request,
+    response: Response,
     page: int = 1,
     limit: int = 20,
     db: Session = Depends(get_db)
 ):
     """渲染上传日志页面"""
+    # 获取或创建会话
+    _, user_id = get_or_create_session(request, response)
+    
     # 计算偏移量
     offset = (page - 1) * limit
     
-    # 查询日志总数
-    total_logs = db.query(func.count(UploadLog.id)).scalar()
+    # 查询当前用户的日志总数
+    total_logs = db.query(func.count(UploadLog.id)).filter(UploadLog.user_id == user_id).scalar()
     
-    # 分页查询日志
-    logs = db.query(UploadLog).order_by(UploadLog.upload_time.desc()).offset(offset).limit(limit).all()
+    # 分页查询当前用户的日志
+    logs = db.query(UploadLog).filter(UploadLog.user_id == user_id).order_by(UploadLog.upload_time.desc()).offset(offset).limit(limit).all()
     
     # 计算总页数
     total_pages = (total_logs + limit - 1) // limit
@@ -62,8 +92,11 @@ async def view_logs(
 
 # 管理面板路由
 @router.get("/admin", tags=["页面"], summary="管理面板", description="PicUI管理面板")
-async def admin_panel(request: Request):
+async def admin_panel(request: Request, response: Response):
     """渲染管理面板模板"""
+    # 获取或创建会话
+    get_or_create_session(request, response)
+    
     return templates.TemplateResponse(
         "admin.html",
         {"request": request}
@@ -73,19 +106,23 @@ async def admin_panel(request: Request):
 @router.get("/admin/short-links", tags=["页面"], summary="短链管理", description="管理短链接", response_class=HTMLResponse)
 async def manage_short_links(
     request: Request,
+    response: Response,
     page: int = 1,
     limit: int = 20,
     search: str = "",
     db: Session = Depends(get_db)
 ):
     """渲染短链接管理页面"""
+    # 获取或创建会话
+    _, user_id = get_or_create_session(request, response)
+    
     # 计算偏移量
     offset = (page - 1) * limit
     
-    # 构建查询
+    # 构建查询 - 只查询当前用户上传的图片相关的短链接
     query = db.query(ShortLink).join(
-        Image, ShortLink.target_file == Image.filename, isouter=True
-    )
+        Image, ShortLink.target_file == Image.filename
+    ).filter(Image.user_id == user_id)
     
     # 添加搜索条件
     if search:
@@ -115,6 +152,10 @@ async def manage_short_links(
             "total": total,
             "limit": limit,
             "search": search,
-            "now": datetime.now()
+            "now": datetime.now(),
+            "max": max,  # 提供内置的max函数
+            "min": min   # 提供内置的min函数
         }
-    ) 
+    )
+
+# 删除了测试页面路由 

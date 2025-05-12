@@ -71,6 +71,7 @@ def optimize_image(img_path: str, max_size: int = 1920, max_dimension: int = 500
             
             # 保存优化后的图片，保持原格式
             img.save(img_path, quality=90, optimize=True)
+            logger.info(f"✓ 图片已优化: {img_path} ({original_width}x{original_height} → {width}x{height})")
             return True
     except Exception as e:
         logger.error(f"图片优化失败: {str(e)}")
@@ -137,18 +138,18 @@ def add_watermark(img_path: str, text: str, position: str = "center",
             try:
                 # 对于Windows系统
                 font = ImageFont.truetype('arial.ttf', size=int(min(img.size) / 20))
-                logger.info("使用Windows系统字体: arial.ttf")
+                logger.info(f"使用Windows系统字体: arial.ttf")
             except Exception as e:
                 logger.warning(f"加载Windows字体失败: {str(e)}")
                 try:
                     # 对于Linux系统
                     font = ImageFont.truetype('/usr/share/fonts/truetype/dejavu/DejaVuSans.ttf', size=int(min(img.size) / 20))
-                    logger.info("使用Linux系统字体: DejaVuSans.ttf")
+                    logger.info(f"使用Linux系统字体: DejaVuSans.ttf")
                 except Exception as e:
                     logger.warning(f"加载Linux字体失败: {str(e)}")
                     # 降级到默认字体
                     font = ImageFont.load_default()
-                    logger.info("使用默认字体")
+                    logger.info(f"使用默认字体")
             
             # 获取文本大小 - 使用textbbox或fallback到textsize
             try:
@@ -218,7 +219,7 @@ def add_watermark(img_path: str, text: str, position: str = "center",
             if original_format:
                 result.format = original_format
             
-            logger.info(f"水印添加完成: 结果图片尺寸={result.size}, 模式={result.mode}, 格式={result.format}")
+            logger.info(f"✓ 水印添加完成: 结果图片尺寸={result.size}, 模式={result.mode}, 格式={result.format}")
             
             # 如果指定了输出路径，则保存图片
             if output_path:
@@ -227,6 +228,7 @@ def add_watermark(img_path: str, text: str, position: str = "center",
                     result.save(output_path, format=result.format, quality=95)
                 else:
                     result.save(output_path, format=result.format)
+                logger.info(f"✓ 水印图片已保存")
                 return True
             else:
                 return result
@@ -234,7 +236,7 @@ def add_watermark(img_path: str, text: str, position: str = "center",
         except Exception as inner_e:
             logger.error(f"处理水印图层时出错: {str(inner_e)}", exc_info=True)
             # 如果水印处理出错，返回原始图片作为后备方案
-            logger.warning("返回原始图片作为后备方案")
+            logger.warning(f"返回原始图片作为后备方案")
             return img
     except Exception as e:
         logger.error(f"添加水印失败: {str(e)}", exc_info=True)
@@ -299,16 +301,33 @@ def check_disk_usage(upload_dir: str, threshold: float = 80.0):
         # 获取目录所在分区的总空间和可用空间
         total, used, free = shutil.disk_usage(upload_path)
         
-        # 计算利用率百分比
+        # 计算利用率
         usage_percent = (used / total) * 100
         
-        logger.info(f"磁盘使用率检查: {usage_percent:.2f}% (总空间: {total/1024/1024/1024:.2f}GB, 已用: {used/1024/1024/1024:.2f}GB)")
+        # 格式化输出
+        total_gb = total / (1024 * 1024 * 1024)
+        used_gb = used / (1024 * 1024 * 1024)
+        free_gb = free / (1024 * 1024 * 1024)
         
-        # 如果利用率超过阈值，记录警告
-        if usage_percent > threshold:
-            warning_msg = f"警告: 磁盘空间使用率已达 {usage_percent:.2f}%，超过设定阈值 {threshold}%"
-            logger.warning(warning_msg)
-        
+        if usage_percent >= threshold:
+            # 达到或超过警告阈值
+            logger.warning(
+                f"⚠ 磁盘空间警告: 利用率 {usage_percent:.1f}% 超过阈值 {threshold}%\n"
+                f"总容量: {total_gb:.2f} GB, 已用: {used_gb:.2f} GB, 剩余: {free_gb:.2f} GB"
+            )
+        else:
+            # 正常情况，记录信息
+            logger.info(
+                f"磁盘空间正常: 利用率 {usage_percent:.1f}%\n"
+                f"总容量: {total_gb:.2f} GB, 已用: {used_gb:.2f} GB, 剩余: {free_gb:.2f} GB"
+            )
+            
+        # 如果磁盘空间少于1GB，发出紧急警告
+        if free_gb < 1.0:
+            logger.critical(
+                f"🔴 磁盘空间严重不足! 剩余空间仅 {free_gb:.2f} GB"
+            )
+            
         return usage_percent
     except Exception as e:
         logger.error(f"检查磁盘空间时出错: {str(e)}")

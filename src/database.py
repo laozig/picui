@@ -1,6 +1,7 @@
 from sqlalchemy import create_engine, Column, Integer, String, Float, DateTime, Boolean, ForeignKey, Text, BigInteger
 from sqlalchemy.ext.declarative import declarative_base
 from sqlalchemy.orm import sessionmaker, relationship
+from sqlalchemy.sql import func
 import datetime
 import os
 import secrets
@@ -32,9 +33,14 @@ class Image(Base):
     id = Column(Integer, primary_key=True, index=True)
     filename = Column(String, unique=True, index=True)
     original_filename = Column(String)
-    size = Column(Float)  # 以KB为单位
-    mime_type = Column(String)
-    upload_time = Column(DateTime, default=datetime.datetime.utcnow)
+    file_size = Column(Float)  # 单位：KB
+    upload_time = Column(DateTime, default=func.now())
+    upload_ip = Column(String)
+    user_id = Column(String, index=True, nullable=True)  # 添加用户ID字段
+    mime_type = Column(String, default="image/jpeg")  # MIME类型
+    width = Column(Integer, nullable=True)  # 图片宽度
+    height = Column(Integer, nullable=True)  # 图片高度
+    description = Column(Text, nullable=True)  # 图片描述
     
     def __repr__(self):
         return f"<Image {self.filename}>"
@@ -44,18 +50,18 @@ class UploadLog(Base):
     __tablename__ = "upload_logs"
     
     id = Column(Integer, primary_key=True, index=True)
-    filename = Column(String, index=True)
     original_filename = Column(String)
-    size = Column(Float)  # 以KB为单位
-    mime_type = Column(String)
-    upload_time = Column(DateTime, default=datetime.datetime.utcnow)
-    ip_address = Column(String)
-    user_agent = Column(String)
-    status = Column(String)  # 成功、失败或删除
+    saved_filename = Column(String, nullable=True)
+    status = Column(String)  # success, failed
+    file_size = Column(Float, nullable=True)  # 单位：KB
     error_message = Column(Text, nullable=True)
+    upload_time = Column(DateTime, default=func.now())
+    ip_address = Column(String)
+    user_agent = Column(String, nullable=True)
+    user_id = Column(String, index=True, nullable=True)  # 添加用户ID字段
     
     def __repr__(self):
-        return f"<UploadLog {self.filename} - {self.status}>"
+        return f"<UploadLog {self.original_filename} - {self.status}>"
 
 # 定义短链接模型
 class ShortLink(Base):
@@ -64,9 +70,11 @@ class ShortLink(Base):
     id = Column(Integer, primary_key=True, index=True)
     code = Column(String, unique=True, index=True)  # 短链接编码，例如 abc123
     target_file = Column(String, index=True)  # 指向的原始图片文件名
-    created_at = Column(DateTime, default=datetime.datetime.utcnow)
-    access_count = Column(BigInteger, default=0)  # 访问计数
+    created_at = Column(DateTime, default=func.now())
+    access_count = Column(Integer, default=0)  # 访问计数
     expire_at = Column(DateTime, nullable=True)  # 过期时间，为null则永不过期
+    is_enabled = Column(Boolean, default=True)
+    user_id = Column(String, index=True, nullable=True)  # 添加用户ID字段
     
     def is_expired(self):
         """检查链接是否已过期"""
@@ -97,4 +105,8 @@ def get_db():
     try:
         yield db
     finally:
-        db.close() 
+        db.close()
+
+# 如果数据库文件不存在，则创建表
+if not os.path.exists("picui.db"):
+    create_tables() 

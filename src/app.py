@@ -7,11 +7,13 @@ import threading
 import os
 import prometheus_client
 from prometheus_client import CollectorRegistry
+import uuid
 
-from src.database import create_tables
+from src.database import create_tables, get_db, Image, UploadLog, ShortLink
 from src.routes import router as api_router
 from src.page_routes import router as page_router, set_templates
 from src.utils import check_disk_usage
+from src.session import clean_expired_sessions
 
 # 配置日志记录器
 logging.basicConfig(level=logging.INFO)
@@ -31,6 +33,7 @@ UPLOAD_DIR = os.getenv("UPLOAD_DIR", "uploads")
 PORT = int(os.getenv("PORT", 8000))
 HOST = os.getenv("HOST", "0.0.0.0")
 BASE_URL = os.getenv("BASE_URL", f"http://localhost:{PORT}")
+SESSION_CLEANUP_INTERVAL = int(os.getenv("SESSION_CLEANUP_INTERVAL", 3600))  # 默认每小时清理一次会话
 
 # 设置Prometheus指标
 try:
@@ -74,13 +77,64 @@ def schedule_disk_check():
     # 计划下一次检查
     threading.Timer(DISK_CHECK_INTERVAL, schedule_disk_check).start()
 
+# 定期清理过期会话
+def schedule_session_cleanup():
+    """定期清理过期会话"""
+    clean_expired_sessions()
+    # 计划下一次清理
+    threading.Timer(SESSION_CLEANUP_INTERVAL, schedule_session_cleanup).start()
+
 # 在应用启动时创建数据库表
 @app.on_event("startup")
 def startup_event():
     """应用启动时执行的初始化操作"""
     create_tables()
+    
+    # 更新现有数据的user_id字段
+    try:
+        # 获取数据库连接
+        db = next(get_db())
+        
+        # 检查是否有需要设置user_id的数据
+        images_without_user_id = db.query(Image).filter(Image.user_id == None).all()
+        logs_without_user_id = db.query(UploadLog).filter(UploadLog.user_id == None).all()
+        links_without_user_id = db.query(ShortLink).filter(ShortLink.user_id == None).all()
+        
+        # 按IP地址分组
+        ip_groups = {}
+        
+        # 处理图片数据
+        for img in images_without_user_id:
+            if img.upload_ip not in ip_groups:
+                ip_groups[img.upload_ip] = str(uuid.uuid4())
+            img.user_id = ip_groups[img.upload_ip]
+        
+        # 处理日志数据
+        for log in logs_without_user_id:
+            if log.ip_address not in ip_groups:
+                ip_groups[log.ip_address] = str(uuid.uuid4())
+            log.user_id = ip_groups[log.ip_address]
+        
+        # 处理短链接数据（根据关联的图片）
+        for link in links_without_user_id:
+            img = db.query(Image).filter(Image.filename == link.target_file).first()
+            if img and img.user_id:
+                link.user_id = img.user_id
+            elif img and img.upload_ip in ip_groups:
+                link.user_id = ip_groups[img.upload_ip]
+        
+        # 提交更改
+        db.commit()
+        logger.info(f"✓ 数据库迁移完成: 更新了 {len(images_without_user_id)} 个图片, {len(logs_without_user_id)} 个日志, {len(links_without_user_id)} 个短链接的用户ID")
+        
+    except Exception as e:
+        logger.error(f"数据库迁移失败: {str(e)}", exc_info=True)
+    
     # 启动磁盘空间检查
     schedule_disk_check()
+    # 启动会话清理
+    schedule_session_cleanup()
+    logger.info("✓ 应用启动完成，会话系统已启用")
 
 # Prometheus 指标接口
 @app.get("/metrics")

@@ -233,7 +233,7 @@
             <div class="mt-6 text-center">
                 <button id="upload-another" class="w-full py-3 bg-blue-500 hover:bg-blue-600 text-white rounded-lg transition">
                     <i class="fas fa-upload mr-2"></i> 再次上传
-                </button>
+                        </button>
             </div>
         </div>
         
@@ -348,26 +348,26 @@
                 
                 // 将FileList转换为数组并处理
                 Array.from(files).forEach(file => {
-                    // 检查文件是否为图片
-                    if (!file.type.startsWith('image/')) {
+                // 检查文件是否为图片
+                if (!file.type.startsWith('image/')) {
                         showStatus(`错误: ${file.name} 不是图片文件`, 'error');
-                        return;
-                    }
-                    
-                    // 检查文件扩展名是否支持
-                    const extension = file.name.split('.').pop().toLowerCase();
-                    if (supportedFormats.length > 0 && !supportedFormats.includes(extension)) {
-                        showStatus(`错误: 不支持的图片格式 ${extension}`, 'error');
-                        return;
-                    }
-                    
-                    // 检查文件大小
-                    const maxSizeBytes = maxFileSizeMB * 1024 * 1024;
-                    if (file.size > maxSizeBytes) {
+                    return;
+                }
+                
+                // 检查文件扩展名是否支持
+                const extension = file.name.split('.').pop().toLowerCase();
+                if (supportedFormats.length > 0 && !supportedFormats.includes(extension)) {
+                    showStatus(`错误: 不支持的图片格式 ${extension}`, 'error');
+                    return;
+                }
+                
+                // 检查文件大小
+                const maxSizeBytes = maxFileSizeMB * 1024 * 1024;
+                if (file.size > maxSizeBytes) {
                         showStatus(`错误: ${file.name} 大小超过${maxFileSizeMB}MB`, 'error');
-                        return;
-                    }
-                    
+                    return;
+                }
+                
                     // 添加到选中文件数组
                     selectedFiles.push(file);
                     
@@ -477,8 +477,8 @@
                     const file = selectedFiles[i];
                     
                     try {
-                        // 创建FormData
-                        const formData = new FormData();
+                // 创建FormData
+                const formData = new FormData();
                         formData.append('file', file);
                         
                         // 发送上传请求并监控进度
