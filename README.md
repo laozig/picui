@@ -11,7 +11,7 @@ PicUI是一个基于FastAPI的简单高效图床服务，支持图片上传、�
 - **多格式支持**：兼容JPG、PNG、GIF、WEBP、BMP、TIFF、SVG、ICO、HEIC等多种图片格式
 - **图像处理**：自动优化图片尺寸、添加自定义水印
 - **安全可控**：内容安全检测、频率限制
-- **分享功能**：短链接生成、临时外链、HTML/Markdown代码生成
+- **分享功能**：自动生成短链接、临时外链、HTML/Markdown代码生成
 - **多色主题**：支持深色、浅色、蓝色、绿色、紫色等多种主题
 - **监控统计**：Prometheus指标支持、上传日志记录
 - **高性能设计**：多线程处理、异步IO、并发控制
@@ -94,6 +94,7 @@ print(response.json())
 | `THREAD_POOL_SIZE` | 线程池大小 | CPU核心数*4 |
 | `RATE_LIMIT` | 限制请求数/分钟 | 20 |
 | `OFFLINE_CHECK_ENABLED` | 启用离线内容检测 | false |
+| `LOGLEVEL` | 日志级别 | info |
 
 更多配置选项请查看[环境变量配置](docs/环境变量配置.md)文档。
 
@@ -112,6 +113,36 @@ print(response.json())
 - HEIC/HEIF
 - AVIF
 - JFIF
+
+## 短链接功能
+
+PicUI提供便捷的短链接功能，使图片分享更加简单:
+
+### 自动生成短链接
+
+- 每次上传图片成功后，系统会自动生成一个默认有效期为3天的短链接
+- 短链接格式为`/s/{code}`，例如`/s/a1b2c3`
+- 短链接会包含在上传响应中的`short_url`字段
+
+### 手动创建临时外链
+
+通过API可以手动创建临时外链:
+
+```
+POST /create-temp-link/{image_id}?expire_minutes=1440
+```
+
+参数说明:
+- `image_id`: 图片ID
+- `expire_minutes`: 链接有效时间(分钟)，最长7天(10080分钟)
+
+### 短链接管理
+
+访问`/admin/short-links`可以管理所有您创建的短链接，包括:
+- 查看所有短链接
+- 监控短链接访问次数
+- 删除不需要的短链接
+- 查看过期状态
 
 ## 水印功能
 
@@ -209,17 +240,6 @@ PicUI使用会话Cookie进行用户身份识别，主要特点：
 |---------|------|-------|
 | `SESSION_CLEANUP_INTERVAL` | 会话清理间隔（秒） | 3600 |
 
-## 代码清理与优化
-
-项目已进行以下优化：
-
-- 删除了测试文件 (`run_tests.py`, `test_main.py`, `pytest.ini`)
-- 删除了测试页面路由 `/test` 和相关模板 `simple_index.html`
-- 删除了旧版备份文件 `main.py.old`
-- 优化了文件组织结构，移除了未使用的模块
-- 增强了数据库兼容性，自动处理表结构不匹配问题
-- 添加了数据库结构自动升级功能，支持平滑迁移
-
 ## 数据库兼容性
 
 系统现在能够自动处理数据库表结构变更：
@@ -231,9 +251,11 @@ PicUI使用会话Cookie进行用户身份识别，主要特点：
 
 ### 已修复的数据库问题
 
-- `images`表缺少`file_size`和`upload_ip`列，现已自动添加
+- `images`表缺少`file_size`、`upload_ip`、`width`、`height`和`description`列，现已自动添加
 - `upload_logs`表缺少`saved_filename`和`file_size`列，现已自动添加
 - `short_links`表缺少`is_enabled`列，现已自动添加
+- 所有表（`images`、`upload_logs`、`short_links`）的`user_id`列类型已从`INTEGER`改为`TEXT`
+- 为所有表的`user_id`列添加了索引，提高查询性能
 
 如果应用启动时仍有数据库结构警告，可以执行以下命令手动修复：
 
@@ -241,11 +263,35 @@ PicUI使用会话Cookie进行用户身份识别，主要特点：
 python -c "from src.database import upgrade_database; upgrade_database()"
 ```
 
-最近修复记录：
-- 2023-05-12: 添加 `upload_ip` 列到 `images` 表
+## 代码清理与优化
+
+项目已进行以下优化：
+
+- 删除了临时修复脚本 (`fix_db.py`, `fix_type.py`, `fix_width_height.py`)
+- 删除了数据库检查脚本 (`check_db.py`, `check_db_structure.py`) 
+- 删除了测试文件 (`test_db_upgrade.py`)
+- 合并了重复的运行脚本，统一使用 `main.py`
+- 移除了多余的日志文件
+- 增强了日志系统，添加了过滤器防止重复警告
+- 优化了图片上传流程，自动生成短链接
+- 改进了日志级别设置，默认使用info级别以提供更多调试信息
+
+## 最近更新
+
+- **2023.12.15**: 
+  - 修复了所有表的user_id字段类型不匹配问题
+  - 完善了数据库自动升级功能
+
+- **2024.01.10**:
+  - 优化了日志输出，改进了过滤器降低重复警告
+  - 修复了图片上传时宽高信息采集错误
+
+- **2024.05.15**:
+  - 修复了短链接功能无法生成的问题
+  - 图片上传现在自动生成短链接，有效期默认为3天
+  - 清理了项目代码，移除了未使用的修复脚本和测试文件
+  - 更新了.gitignore文件，更好地忽略临时文件和数据库备份
 
 ## API接口
 
-### 图片上传
-
-```
+详细API文档请访问运行实例的 `/docs` 或 `/redoc` 路径，或查看[API文档](docs/API文档.md)。

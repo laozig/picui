@@ -9,6 +9,7 @@ import uvicorn
 import asyncio
 import multiprocessing
 import time
+import shutil
 from datetime import datetime
 import logging
 
@@ -37,7 +38,7 @@ except ImportError:
 PORT = int(os.getenv("PORT", 8000))
 HOST = os.getenv("HOST", "0.0.0.0")
 WORKERS = int(os.getenv("WORKERS", 8))
-LOGLEVEL = os.getenv("LOGLEVEL", "warning").lower()  # 默认使用warning级别
+LOGLEVEL = os.getenv("LOGLEVEL", "info").lower()  # 默认使用info级别，可以看到更多日志
 RELOAD = os.getenv("RELOAD", "false").lower() == "true"
 
 # 设置日志级别映射
@@ -50,13 +51,27 @@ log_levels = {
 }
 
 # 获取实际日志级别
-log_level = log_levels.get(LOGLEVEL, logging.WARNING)
+log_level = log_levels.get(LOGLEVEL, logging.ERROR)
 
 # 配置日志
 logging.basicConfig(
     level=log_level,
     format="%(levelname)s:%(name)s:%(message)s"
 )
+
+# 清理过大的日志文件
+def cleanup_logs():
+    """清理过期日志文件"""
+    log_file = "upload.log"
+    if os.path.exists(log_file) and os.path.getsize(log_file) > 10 * 1024 * 1024:  # 超过10MB
+        print(f"{Colors.YELLOW}日志文件过大，进行清理...{Colors.ENDC}")
+        # 备份旧日志
+        timestamp = time.strftime("%Y%m%d-%H%M%S")
+        backup_file = f"upload_{timestamp}.log.bak"
+        shutil.copy2(log_file, backup_file)
+        # 清空当前日志
+        open(log_file, 'w').close()
+        print(f"{Colors.GREEN}✓ 日志已清理并备份到 {backup_file}{Colors.ENDC}")
 
 def print_banner():
     """打印美化的启动横幅"""
@@ -96,6 +111,18 @@ def main():
     主入口函数
     使用uvicorn启动FastAPI应用，根据CPU核心数自动配置工作进程
     """
+    # 清理过大的日志文件
+    cleanup_logs()
+    
+    # 从src.database导入并执行数据库升级
+    try:
+        from src.database import upgrade_database
+        print(f"{Colors.BLUE}正在升级数据库结构...{Colors.ENDC}")
+        upgrade_database()
+        print(f"{Colors.GREEN}✓ 数据库升级完成{Colors.ENDC}")
+    except Exception as e:
+        print(f"{Colors.RED}! 数据库升级失败: {str(e)}{Colors.ENDC}")
+    
     print_banner()
     print_config()
     

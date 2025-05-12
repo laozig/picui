@@ -15,9 +15,45 @@ from src.page_routes import router as page_router, set_templates
 from src.utils import check_disk_usage
 from src.session import clean_expired_sessions
 
+# 创建日志过滤器，过滤掉特定的警告和错误消息
+class SupressFilter(logging.Filter):
+    """过滤掉重复的数据库结构警告"""
+    def __init__(self, suppress_texts):
+        super().__init__()
+        self.suppress_texts = suppress_texts
+        self.logged_messages = set()  # 存储已记录的消息，避免重复
+        
+    def filter(self, record):
+        # 检查消息是否包含任何要过滤的文本
+        message = record.getMessage()
+        
+        # 如果是短链接创建相关的信息，允许通过
+        if "短链接创建成功" in message or "开始生成短链接" in message:
+            return True
+            
+        # 过滤重复的警告消息
+        for text in self.suppress_texts:
+            if text in message:
+                # 如果是已记录过的消息，直接过滤掉
+                if message in self.logged_messages:
+                    return False
+                # 第一次出现的消息允许记录，但会被加入已记录集合
+                self.logged_messages.add(message)
+                break
+        return True
+
 # 配置日志记录器
 logging.basicConfig(level=logging.INFO)
 logger = logging.getLogger("picui")
+
+# 添加日志过滤器
+db_filter = SupressFilter([
+    "no such column", 
+    "数据库表结构与模型不匹配", 
+    "duplicate column name",
+    "无法添加"
+])
+logger.addFilter(db_filter)
 
 # 创建文件处理器
 file_handler = logging.FileHandler("upload.log", encoding="utf-8")

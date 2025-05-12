@@ -14,6 +14,7 @@ import threading
 import concurrent.futures
 from pathlib import Path
 from typing import Optional, Dict, List, Union
+from PIL import Image as PILImage
 
 from src.database import get_db, Image, UploadLog, ShortLink
 from src.utils import (
@@ -113,29 +114,40 @@ def generate_short_link(filename, expire_minutes=None, db=None, user_id=None):
     返回:
     - 短链接编码
     """
+    # 记录开始生成短链接的日志
+    logger.info(f"开始生成短链接: 文件={filename}, 过期时间={expire_minutes}分钟, 用户ID={user_id}")
+    
     # 生成随机短链接代码
     while True:
         code = ShortLink.generate_code()
         # 检查代码是否已存在
         existing = db.query(ShortLink).filter(ShortLink.code == code).first()
         if not existing:
+            logger.debug(f"生成的短链接代码: {code}")
             break
     
     # 计算过期时间
     expire_at = None
     if expire_minutes:
         expire_at = datetime.utcnow() + timedelta(minutes=expire_minutes)
+        logger.debug(f"短链接过期时间设置为: {expire_at}")
     
-    # 创建短链接记录
-    short_link = ShortLink(
-        code=code,
-        target_file=filename,
-        expire_at=expire_at,
-        user_id=user_id  # 添加用户ID
-    )
-    
-    db.add(short_link)
-    db.commit()
+    try:
+        # 创建短链接记录
+        short_link = ShortLink(
+            code=code,
+            target_file=filename,
+            expire_at=expire_at,
+            user_id=user_id  # 添加用户ID
+        )
+        
+        db.add(short_link)
+        db.commit()
+        logger.info(f"短链接创建成功: code={code}, 文件={filename}")
+    except Exception as e:
+        logger.error(f"创建短链接失败: {str(e)}", exc_info=True)
+        db.rollback()
+        raise
     
     return code
 
@@ -276,6 +288,16 @@ async def upload_image(
                     except Exception:
                         logger.warning(f"无法设置mime_type字段，数据库可能不支持该字段")
                     
+                    # 尝试设置宽高信息
+                    try:
+                        # 使用PIL获取图片尺寸
+                        with PILImage.open(file_location) as img_obj:
+                            img.width = img_obj.width
+                            img.height = img_obj.height
+                            logger.debug(f"设置图片尺寸: {img_obj.width}x{img_obj.height}")
+                    except Exception as e:
+                        logger.debug(f"无法设置图片尺寸，跳过: {str(e)}")
+                    
                     db.add(img)
                     try:
                         db.commit()
@@ -397,14 +419,52 @@ async def upload_image(
                 # 生成访问URL
                 access_url = f"{BASE_URL}/images/{filename}"
                 
+                # 自动生成短链接 (设置为3天有效期)
+                short_url = None
+                try:
+                    logger.info(f"为上传图片自动生成短链接: {filename}")
+                    # 查询刚刚插入的图片ID
+                    image = db.query(Image).filter(Image.filename == filename).first()
+                    if image:
+                        # 生成短链接 (3天 = 4320分钟)
+                        code = generate_short_link(
+                            filename=filename,
+                            expire_minutes=4320,  # 3天有效期
+                            db=db,
+                            user_id=user_id
+                        )
+                        # 生成完整的短链接URL
+                        if request:
+                            base_url = f"{request.url.scheme}://{request.url.netloc}"
+                        else:
+                            base_url = BASE_URL
+                        
+                        short_url = f"{base_url}/s/{code}"
+                        logger.info(f"自动生成短链接成功: {short_url}")
+                except Exception as e:
+                    logger.error(f"自动生成短链接失败: {str(e)}", exc_info=True)
+                    # 继续处理，短链接生成失败不影响上传完成
+                
+                # 创建HTML和Markdown代码
+                html_code = f'<img src="{access_url}" alt="{original_filename}" />'
+                markdown_code = f'![{original_filename}]({access_url})'
+                
                 # 添加到结果列表
                 logger.debug(f"✓ 文件上传成功: {filename} ({file_size_kb:.1f} KB)")
-                results.append({
+                result = {
                     "url": access_url,
                     "filename": filename,
                     "original_filename": original_filename,
-                    "size": file_size_kb
-                })
+                    "size": file_size_kb,
+                    "html_code": html_code,
+                    "markdown_code": markdown_code
+                }
+                
+                # 如果生成了短链接，添加到结果中
+                if short_url:
+                    result["short_url"] = short_url
+                
+                results.append(result)
                 
         except Exception as e:
             logger.error(f"文件上传处理异常: {str(e)}")
@@ -665,40 +725,59 @@ async def create_temp_link(
     response: Response = None,
     db: Session = Depends(get_db)
 ):
-    # 获取或创建会话
-    _, user_id = get_or_create_session(request, response)
+    logger.info(f"接收到创建临时外链请求: 图片ID={image_id}, 有效时间={expire_minutes}分钟")
     
-    # 查询图片
-    image = db.query(Image).filter(Image.id == image_id).first()
-    if not image:
-        raise HTTPException(status_code=404, detail="图片不存在")
-    
-    # 检查权限 - 只能为自己的图片创建外链
-    if user_id and image.user_id != user_id:
-        raise HTTPException(status_code=403, detail="您无权为其他用户的图片创建外链")
-    
-    # 创建临时短链接
-    code = generate_short_link(
-        filename=image.filename,
-        expire_minutes=expire_minutes,
-        db=db,
-        user_id=user_id
-    )
-    
-    # 生成完整URL
-    if request:
-        base_url = f"{request.url.scheme}://{request.url.netloc}"
-    else:
-        base_url = BASE_URL
-    
-    short_url = f"{base_url}/s/{code}"
-    
-    # 计算到期时间
-    expire_at = datetime.utcnow() + timedelta(minutes=expire_minutes)
-    
-    return {
-        "short_url": short_url,
-        "code": code,
-        "expire_at": expire_at.isoformat(),
-        "original_url": f"{base_url}/images/{image.filename}"
-    } 
+    try:
+        # 获取或创建会话
+        _, user_id = get_or_create_session(request, response)
+        logger.debug(f"用户会话信息: user_id={user_id}")
+        
+        # 查询图片
+        image = db.query(Image).filter(Image.id == image_id).first()
+        if not image:
+            logger.warning(f"创建临时外链失败: 图片不存在, ID={image_id}")
+            raise HTTPException(status_code=404, detail="图片不存在")
+        
+        logger.debug(f"找到图片: filename={image.filename}, user_id={image.user_id}")
+        
+        # 检查权限 - 只能为自己的图片创建外链
+        if user_id and image.user_id != user_id:
+            logger.warning(f"权限不足: 用户({user_id})尝试为其他用户({image.user_id})的图片创建外链")
+            raise HTTPException(status_code=403, detail="您无权为其他用户的图片创建外链")
+        
+        # 创建临时短链接
+        try:
+            code = generate_short_link(
+                filename=image.filename,
+                expire_minutes=expire_minutes,
+                db=db,
+                user_id=user_id
+            )
+        except Exception as e:
+            logger.error(f"创建短链接失败: {str(e)}", exc_info=True)
+            raise HTTPException(status_code=500, detail="创建短链接时发生错误")
+        
+        # 生成完整URL
+        if request:
+            base_url = f"{request.url.scheme}://{request.url.netloc}"
+        else:
+            base_url = BASE_URL
+        
+        short_url = f"{base_url}/s/{code}"
+        logger.info(f"临时外链创建成功: code={code}, url={short_url}")
+        
+        # 计算到期时间
+        expire_at = datetime.utcnow() + timedelta(minutes=expire_minutes)
+        
+        return {
+            "short_url": short_url,
+            "code": code,
+            "expire_at": expire_at.isoformat(),
+            "original_url": f"{base_url}/images/{image.filename}"
+        }
+    except HTTPException:
+        # 传递HTTP异常
+        raise
+    except Exception as e:
+        logger.error(f"创建临时外链时发生未知错误: {str(e)}", exc_info=True)
+        raise HTTPException(status_code=500, detail=f"创建临时外链时发生未知错误: {str(e)}")

@@ -37,6 +37,9 @@ coverage.xml
 *.db
 *.sqlite3
 *.sqlite
+picui_backup_*.db  # 数据库备份文件
+*.db.bak
+*.db-journal
 
 # 上传的文件
 uploads/*
@@ -46,6 +49,7 @@ temp/*
 
 # 日志
 *.log
+*.log.bak
 logs/
 log/
 
@@ -85,6 +89,8 @@ desktop.ini
 # PicUI特定
 picui.db-journal
 .picui_cache/
+fix_*.py  # 修复脚本
+check_*.py  # 检查脚本
 
 # Docker
 .dockerignore
