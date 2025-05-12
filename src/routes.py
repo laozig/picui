@@ -150,11 +150,13 @@ async def process_image(file_location: str, original_filename: str, client_ip: s
     
     try:
         # 在线程池中执行图片优化（CPU密集型操作）
-        await loop.run_in_executor(thread_pool, optimize_image, file_location)
+        result = await loop.run_in_executor(thread_pool, optimize_image, file_location)
+        if result:
+            logger.debug(f"✓ 图片已优化: {os.path.basename(file_location)} {result}")
         
         # 如果启用了离线检测，在线程池中执行检测
         if OFFLINE_CHECK_ENABLED:
-            logger.info(f"执行图片内容检测: {file_location}")
+            logger.debug(f"执行图片内容检测: {os.path.basename(file_location)}")
             is_safe = await loop.run_in_executor(
                 thread_pool, 
                 lambda: offline_image_check(file_location, SKIN_THRESHOLD)
@@ -175,10 +177,8 @@ async def process_image(file_location: str, original_filename: str, client_ip: s
                 db.add(log_entry)
                 db.commit()
                 
-                logger.warning(f"图片内容不符合规范，已被拒绝: {file_location}")
+                logger.warning(f"图片内容不符合规范，已被拒绝: {os.path.basename(file_location)}")
                 return False
-            
-            logger.info("✓ 图片内容检测通过: {file_location}")
         
         return True
     except Exception as e:
@@ -240,47 +240,165 @@ async def upload_image(
                 os.makedirs(UPLOAD_DIR, exist_ok=True)
                 
                 # 写入文件
-                logger.info(f"正在保存文件: {original_filename} → {filename}")
                 with open(file_location, "wb+") as file_object:
                     file_object.write(file_size)
+                
+                # 获取文件大小
+                file_size_kb = os.path.getsize(file_location) / 1024
                 
                 # 异步处理图片（优化尺寸和内容检测）
                 if not await process_image(file_location, original_filename, client_ip, user_agent, db):
                     errors.append({"file": original_filename, "error": "图片处理失败"})
                     continue
                 
-                # 获取文件大小
-                file_size_kb = os.path.getsize(file_location) / 1024
-                
                 # 保存图片记录到数据库
-                img = Image(
-                    filename=filename,
-                    original_filename=original_filename,
-                    file_size=file_size_kb,
-                    upload_ip=client_ip,
-                    user_id=user_id  # 添加用户ID
-                )
-                db.add(img)
-                db.commit()
+                try:
+                    # 创建Image对象，但不包括可能缺失的字段
+                    img = Image(
+                        filename=filename,
+                        original_filename=original_filename,
+                        user_id=user_id  # 添加用户ID
+                    )
+                    
+                    # 尝试设置可能缺失的字段
+                    try:
+                        img.file_size = file_size_kb
+                    except Exception:
+                        logger.warning(f"无法设置file_size字段，数据库可能不支持该字段")
+                    
+                    try:
+                        img.upload_ip = client_ip
+                    except Exception:
+                        logger.warning(f"无法设置upload_ip字段，数据库可能不支持该字段")
+                    
+                    try:
+                        img.mime_type = "image/jpeg"
+                    except Exception:
+                        logger.warning(f"无法设置mime_type字段，数据库可能不支持该字段")
+                    
+                    db.add(img)
+                    try:
+                        db.commit()
+                    except Exception as db_error:
+                        # 如果提交失败，可能是表结构问题
+                        db.rollback()
+                        logger.warning(f"提交图片记录失败: {str(db_error)}")
+                        
+                        # 尝试使用最小字段集再次插入
+                        if "no such column" in str(db_error):
+                            # 表结构不匹配的特定错误，尝试不包含可能缺失的字段
+                            logger.warning(f"数据库表结构不匹配，尝试使用最小字段集")
+                            try:
+                                # 执行原始SQL插入，只使用基本字段
+                                from sqlalchemy import text
+                                sql = text("INSERT INTO images (filename, original_filename, user_id) VALUES (:filename, :orig_filename, :user_id)")
+                                db.execute(sql, {"filename": filename, "orig_filename": original_filename, "user_id": user_id})
+                                db.commit()
+                                logger.info(f"使用最小字段集插入图片记录成功")
+                            except Exception as minimal_error:
+                                logger.error(f"使用最小字段集插入图片记录失败: {str(minimal_error)}")
+                                # 如果仍然失败，抛出异常
+                                raise
+                        else:
+                            # 其他数据库错误，重新抛出
+                            raise
+                
+                except Exception as e:
+                    logger.error(f"保存图片记录到数据库时出错: {str(e)}")
+                    # 如果文件已创建但处理失败，删除文件
+                    if os.path.exists(file_location):
+                        try:
+                            os.remove(file_location)
+                        except:
+                            pass
+                    
+                    # 记录错误
+                    errors.append({"file": original_filename, "error": str(e)})
+                    
+                    # 记录上传失败日志
+                    log_entry = UploadLog(
+                        original_filename=original_filename,
+                        status="failed",
+                        error_message=str(e),
+                        ip_address=client_ip,
+                        user_agent=user_agent,
+                        user_id=user_id  # 添加用户ID
+                    )
+                    db.add(log_entry)
+                    try:
+                        db.commit()
+                    except Exception as db_error:
+                        db.rollback()
+                        logger.error(f"记录上传失败日志时出错: {str(db_error)}")
+                        try:
+                            # 尝试不附加额外字段再次提交
+                            db.add(UploadLog(
+                                original_filename=original_filename,
+                                status="failed",
+                                error_message=str(e)[:200],  # 限制错误消息长度
+                                ip_address=client_ip,
+                                user_id=user_id
+                            ))
+                            db.commit()
+                        except Exception:
+                            # 如果仍然失败，放弃记录日志，但不影响主流程
+                            logger.error("无法记录上传失败日志，继续处理")
+                            db.rollback()
                 
                 # 记录上传成功日志
                 log_entry = UploadLog(
                     original_filename=original_filename,
                     status="success",
-                    file_size=file_size_kb,
-                    saved_filename=filename,
                     ip_address=client_ip,
                     user_agent=user_agent,
                     user_id=user_id  # 添加用户ID
                 )
+                
+                # 尝试设置可能缺失的字段
+                try:
+                    log_entry.saved_filename = filename
+                except Exception:
+                    logger.warning(f"无法设置saved_filename字段，数据库可能不支持该字段")
+                
+                try:
+                    log_entry.file_size = file_size_kb
+                except Exception:
+                    logger.warning(f"无法设置file_size字段，数据库可能不支持该字段")
+                
                 db.add(log_entry)
-                db.commit()
+                try:
+                    db.commit()
+                except Exception as db_error:
+                    # 如果提交失败，可能是表结构问题
+                    db.rollback()
+                    logger.warning(f"记录上传日志时出错: {str(db_error)}")
+                    
+                    # 尝试使用最小字段集
+                    if "no such column" in str(db_error):
+                        try:
+                            # 执行原始SQL插入，只使用基本字段
+                            from sqlalchemy import text
+                            sql = text("INSERT INTO upload_logs (original_filename, status, ip_address, user_id) VALUES (:orig_filename, :status, :ip, :user_id)")
+                            db.execute(sql, {
+                                "orig_filename": original_filename, 
+                                "status": "success", 
+                                "ip": client_ip, 
+                                "user_id": user_id
+                            })
+                            db.commit()
+                            logger.info(f"使用最小字段集记录上传日志成功")
+                        except Exception as minimal_error:
+                            logger.error(f"使用最小字段集记录上传日志失败: {str(minimal_error)}")
+                            # 记录错误但不抛出异常，继续处理
+                    else:
+                        # 其他错误记录但不抛出
+                        logger.error(f"记录上传日志时出错: {str(db_error)}")
                 
                 # 生成访问URL
                 access_url = f"{BASE_URL}/images/{filename}"
                 
                 # 添加到结果列表
-                logger.info(f"✓ 文件上传成功: {filename} ({file_size_kb:.1f} KB)")
+                logger.debug(f"✓ 文件上传成功: {filename} ({file_size_kb:.1f} KB)")
                 results.append({
                     "url": access_url,
                     "filename": filename,
@@ -310,7 +428,25 @@ async def upload_image(
                 user_id=user_id  # 添加用户ID
             )
             db.add(log_entry)
-            db.commit()
+            try:
+                db.commit()
+            except Exception as db_error:
+                db.rollback()
+                logger.error(f"记录上传失败日志时出错: {str(db_error)}")
+                try:
+                    # 尝试不附加额外字段再次提交
+                    db.add(UploadLog(
+                        original_filename=original_filename,
+                        status="failed",
+                        error_message=str(e)[:200],  # 限制错误消息长度
+                        ip_address=client_ip,
+                        user_id=user_id
+                    ))
+                    db.commit()
+                except Exception:
+                    # 如果仍然失败，放弃记录日志，但不影响主流程
+                    logger.error("无法记录上传失败日志，继续处理")
+                    db.rollback()
     
     # 返回结果
     if is_multiple:

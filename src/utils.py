@@ -31,51 +31,61 @@ def allowed_file(filename: str) -> bool:
     return '.' in filename and filename.rsplit('.', 1)[1].lower() in ALLOWED_EXTENSIONS
 
 # 优化图片尺寸
-def optimize_image(img_path: str, max_size: int = 1920, max_dimension: int = 5000) -> bool:
+def optimize_image(input_path: str) -> str:
     """
-    优化图片：
-    1. 限制最长边不超过max_size（默认1920px）
-    2. 确保宽高不超过max_dimension（默认5000px）
-    3. 保持原比例
+    优化图片尺寸，减小文件大小
     
-    返回是否修改了图片
+    返回优化结果描述字符串
     """
     try:
-        with PILImage.open(img_path) as img:
-            original_width, original_height = img.size
+        # 检查文件是否存在
+        if not os.path.exists(input_path):
+            logger.error(f"优化图片失败: 文件不存在 {input_path}")
+            return ""
+
+        # 获取文件后缀
+        _, ext = os.path.splitext(input_path)
+        ext = ext.lower()
+
+        # 检查是否是SVG文件，如果是则不进行优化
+        if ext == '.svg':
+            return "(SVG跳过优化)"
+
+        # 检查图片库
+        try:
+            from PIL import Image
+        except ImportError:
+            logger.warning("PIL库未安装，跳过图片优化")
+            return "(PIL缺失)"
+
+        # 打开图片
+        with Image.open(input_path) as img:
+            # 获取原始尺寸
+            orig_width, orig_height = img.size
             
-            # 检查是否需要调整尺寸
-            width, height = original_width, original_height
+            # 检查图片尺寸是否超过限制
+            MAX_WIDTH = 1920
+            MAX_HEIGHT = 1920
             
-            # 检查是否超过最大尺寸限制
-            if width > max_dimension or height > max_dimension:
-                # 计算缩放比例
-                scale = min(max_dimension / width, max_dimension / height)
-                width = int(width * scale)
-                height = int(height * scale)
+            # 如果图片尺寸在范围内，不进行优化
+            if orig_width <= MAX_WIDTH and orig_height <= MAX_HEIGHT:
+                return f"({orig_width}x{orig_height})"
             
-            # 检查最长边是否超过限制
-            longest_side = max(width, height)
-            if longest_side > max_size:
-                # 计算缩放比例
-                scale = max_size / longest_side
-                width = int(width * scale)
-                height = int(height * scale)
+            # 计算等比例缩放后的尺寸
+            ratio = min(MAX_WIDTH / orig_width, MAX_HEIGHT / orig_height)
+            new_width = int(orig_width * ratio)
+            new_height = int(orig_height * ratio)
             
-            # 如果尺寸没有变化，不需要调整
-            if width == original_width and height == original_height:
-                return False
+            # 缩放图片
+            img_resized = img.resize((new_width, new_height), Image.Resampling.LANCZOS)
             
-            # 调整图片尺寸
-            img = img.resize((width, height), PILImage.LANCZOS)
+            # 保存图片
+            img_resized.save(input_path, quality=95, optimize=True)
             
-            # 保存优化后的图片，保持原格式
-            img.save(img_path, quality=90, optimize=True)
-            logger.info(f"✓ 图片已优化: {img_path} ({original_width}x{original_height} → {width}x{height})")
-            return True
+            return f"({orig_width}x{orig_height} → {new_width}x{new_height})"
     except Exception as e:
-        logger.error(f"图片优化失败: {str(e)}")
-        return False
+        logger.error(f"优化图片失败: {str(e)}")
+        return f"(优化出错: {str(e)[:20]}...)"
 
 # 添加水印
 def add_watermark(img_path: str, text: str, position: str = "center", 
@@ -292,43 +302,59 @@ def offline_image_check(file_path: str, skin_threshold: float = 0.5) -> bool:
         logger.error(f"离线图片检测出错: {str(e)}")
         return True  # 出错时默认通过
 
-# 检查磁盘空间利用率
-def check_disk_usage(upload_dir: str, threshold: float = 80.0):
-    """检查磁盘空间利用率，如果超过阈值则记录警告"""
+# 检查磁盘空间使用情况
+def check_disk_usage(path=None, threshold=80.0):
+    """
+    检查指定路径的磁盘空间使用情况
+    
+    当剩余空间低于阈值时，将发出警告
+    
+    参数:
+    - path: 要检查的路径，默认为当前目录
+    - threshold: 磁盘使用率阈值（百分比），超过此值将发出警告
+    """
+    # 如果未指定路径，使用当前目录
+    if path is None:
+        path = os.getcwd()
+    
+    # 确保路径存在
+    if not os.path.exists(path):
+        os.makedirs(path, exist_ok=True)
+    
+    # 获取磁盘使用情况
     try:
-        upload_path = os.path.abspath(upload_dir)
+        if hasattr(os, 'statvfs'):  # Unix/Linux/MacOS
+            stat = os.statvfs(path)
+            free = stat.f_bavail * stat.f_frsize
+            total = stat.f_blocks * stat.f_frsize
+            used = (stat.f_blocks - stat.f_bfree) * stat.f_frsize
+        else:  # Windows
+            import ctypes
+            free_bytes = ctypes.c_ulonglong(0)
+            total_bytes = ctypes.c_ulonglong(0)
+            ctypes.windll.kernel32.GetDiskFreeSpaceExW(
+                ctypes.c_wchar_p(path), None, ctypes.pointer(total_bytes), ctypes.pointer(free_bytes)
+            )
+            total = total_bytes.value
+            free = free_bytes.value
+            used = total - free
         
-        # 获取目录所在分区的总空间和可用空间
-        total, used, free = shutil.disk_usage(upload_path)
+        # 计算使用率
+        used_percent = (used / total) * 100
         
-        # 计算利用率
-        usage_percent = (used / total) * 100
-        
-        # 格式化输出
+        # 转换为可读格式
         total_gb = total / (1024 * 1024 * 1024)
         used_gb = used / (1024 * 1024 * 1024)
         free_gb = free / (1024 * 1024 * 1024)
         
-        if usage_percent >= threshold:
-            # 达到或超过警告阈值
-            logger.warning(
-                f"⚠ 磁盘空间警告: 利用率 {usage_percent:.1f}% 超过阈值 {threshold}%\n"
-                f"总容量: {total_gb:.2f} GB, 已用: {used_gb:.2f} GB, 剩余: {free_gb:.2f} GB"
-            )
+        # 检查是否超过阈值
+        if used_percent > threshold:
+            logger.warning(f"磁盘空间不足，利用率已达 {used_percent:.1f}%。剩余: {free_gb:.2f} GB")
         else:
-            # 正常情况，记录信息
-            logger.info(
-                f"磁盘空间正常: 利用率 {usage_percent:.1f}%\n"
-                f"总容量: {total_gb:.2f} GB, 已用: {used_gb:.2f} GB, 剩余: {free_gb:.2f} GB"
-            )
-            
-        # 如果磁盘空间少于1GB，发出紧急警告
-        if free_gb < 1.0:
-            logger.critical(
-                f"🔴 磁盘空间严重不足! 剩余空间仅 {free_gb:.2f} GB"
-            )
-            
-        return usage_percent
+            # 使用debug级别记录正常情况
+            logger.debug(f"磁盘空间正常: 利用率 {used_percent:.1f}%，总容量: {total_gb:.2f} GB，已用: {used_gb:.2f} GB，剩余: {free_gb:.2f} GB")
+        
+        return used_percent
     except Exception as e:
-        logger.error(f"检查磁盘空间时出错: {str(e)}")
+        logger.error(f"检查磁盘空间出错: {str(e)}")
         return None 

@@ -9,7 +9,7 @@ import prometheus_client
 from prometheus_client import CollectorRegistry
 import uuid
 
-from src.database import create_tables, get_db, Image, UploadLog, ShortLink
+from src.database import create_tables, get_db, Image, UploadLog, ShortLink, upgrade_database
 from src.routes import router as api_router
 from src.page_routes import router as page_router, set_templates
 from src.utils import check_disk_usage
@@ -88,53 +88,72 @@ def schedule_session_cleanup():
 @app.on_event("startup")
 def startup_event():
     """应用启动时执行的初始化操作"""
+    # 创建数据库表
     create_tables()
+    
+    # 尝试升级现有数据库结构
+    upgrade_database()
     
     # 更新现有数据的user_id字段
     try:
         # 获取数据库连接
         db = next(get_db())
         
-        # 检查是否有需要设置user_id的数据
-        images_without_user_id = db.query(Image).filter(Image.user_id == None).all()
-        logs_without_user_id = db.query(UploadLog).filter(UploadLog.user_id == None).all()
-        links_without_user_id = db.query(ShortLink).filter(ShortLink.user_id == None).all()
-        
-        # 按IP地址分组
-        ip_groups = {}
-        
-        # 处理图片数据
-        for img in images_without_user_id:
-            if img.upload_ip not in ip_groups:
-                ip_groups[img.upload_ip] = str(uuid.uuid4())
-            img.user_id = ip_groups[img.upload_ip]
-        
-        # 处理日志数据
-        for log in logs_without_user_id:
-            if log.ip_address not in ip_groups:
-                ip_groups[log.ip_address] = str(uuid.uuid4())
-            log.user_id = ip_groups[log.ip_address]
-        
-        # 处理短链接数据（根据关联的图片）
-        for link in links_without_user_id:
-            img = db.query(Image).filter(Image.filename == link.target_file).first()
-            if img and img.user_id:
-                link.user_id = img.user_id
-            elif img and img.upload_ip in ip_groups:
-                link.user_id = ip_groups[img.upload_ip]
-        
-        # 提交更改
-        db.commit()
-        logger.info(f"✓ 数据库迁移完成: 更新了 {len(images_without_user_id)} 个图片, {len(logs_without_user_id)} 个日志, {len(links_without_user_id)} 个短链接的用户ID")
+        # 先检查表结构是否匹配模型
+        try:
+            # 尝试获取一个图片记录
+            first_image = db.query(Image).first()
+            # 尝试获取一个短链接记录
+            first_link = db.query(ShortLink).first()
+            
+            # 只有当表结构匹配时才执行数据迁移
+            if first_image is not None or first_link is not None:
+                # 检查是否有需要设置user_id的数据
+                images_without_user_id = db.query(Image).filter(Image.user_id == None).all()
+                logs_without_user_id = db.query(UploadLog).filter(UploadLog.user_id == None).all()
+                links_without_user_id = db.query(ShortLink).filter(ShortLink.user_id == None).all()
+                
+                # 只有在有数据需要迁移时才输出日志
+                total_records = len(images_without_user_id) + len(logs_without_user_id) + len(links_without_user_id)
+                if total_records > 0:
+                    # 按IP地址分组
+                    ip_groups = {}
+                    
+                    # 处理图片数据
+                    for img in images_without_user_id:
+                        if img.upload_ip not in ip_groups:
+                            ip_groups[img.upload_ip] = str(uuid.uuid4())
+                        img.user_id = ip_groups[img.upload_ip]
+                    
+                    # 处理日志数据
+                    for log in logs_without_user_id:
+                        if log.ip_address not in ip_groups:
+                            ip_groups[log.ip_address] = str(uuid.uuid4())
+                        log.user_id = ip_groups[log.ip_address]
+                    
+                    # 处理短链接数据（根据关联的图片）
+                    for link in links_without_user_id:
+                        img = db.query(Image).filter(Image.filename == link.target_file).first()
+                        if img and img.user_id:
+                            link.user_id = img.user_id
+                        elif img and img.upload_ip in ip_groups:
+                            link.user_id = ip_groups[img.upload_ip]
+                    
+                    # 提交更改
+                    db.commit()
+                    logger.info(f"✓ 数据库迁移完成: 更新了 {total_records} 条记录的用户ID")
+        except Exception as table_err:
+            logger.warning(f"数据库表结构与模型不匹配: {str(table_err).split('[')[0]}")
+            logger.debug(f"完整错误信息: {str(table_err)}")
         
     except Exception as e:
-        logger.error(f"数据库迁移失败: {str(e)}", exc_info=True)
+        logger.error(f"数据库操作失败: {str(e)}")
     
     # 启动磁盘空间检查
     schedule_disk_check()
     # 启动会话清理
     schedule_session_cleanup()
-    logger.info("✓ 应用启动完成，会话系统已启用")
+    logger.info("✓ 应用启动完成")
 
 # Prometheus 指标接口
 @app.get("/metrics")

@@ -10,6 +10,7 @@ import asyncio
 import multiprocessing
 import time
 from datetime import datetime
+import logging
 
 # 控制台颜色定义
 class Colors:
@@ -35,9 +36,27 @@ except ImportError:
 # 获取环境变量中的配置
 PORT = int(os.getenv("PORT", 8000))
 HOST = os.getenv("HOST", "0.0.0.0")
-WORKERS = int(os.getenv("WORKERS", min(multiprocessing.cpu_count() + 1, 8)))
+WORKERS = int(os.getenv("WORKERS", 8))
+LOGLEVEL = os.getenv("LOGLEVEL", "warning").lower()  # 默认使用warning级别
 RELOAD = os.getenv("RELOAD", "false").lower() == "true"
-LOG_LEVEL = os.getenv("LOG_LEVEL", "info").lower()
+
+# 设置日志级别映射
+log_levels = {
+    "debug": logging.DEBUG,
+    "info": logging.INFO,
+    "warning": logging.WARNING,
+    "error": logging.ERROR,
+    "critical": logging.CRITICAL
+}
+
+# 获取实际日志级别
+log_level = log_levels.get(LOGLEVEL, logging.WARNING)
+
+# 配置日志
+logging.basicConfig(
+    level=log_level,
+    format="%(levelname)s:%(name)s:%(message)s"
+)
 
 def print_banner():
     """打印美化的启动横幅"""
@@ -66,7 +85,7 @@ def print_config():
 {Colors.CYAN}|----------------------------------------|{Colors.ENDC}
 {Colors.CYAN}|  {Colors.YELLOW}监听地址:{Colors.CYAN} {Colors.GREEN}{HOST}:{PORT}{Colors.CYAN}                 |{Colors.ENDC}
 {Colors.CYAN}|  {Colors.YELLOW}工作进程:{Colors.CYAN} {Colors.GREEN}{WORKERS}{Colors.CYAN}                       |{Colors.ENDC}
-{Colors.CYAN}|  {Colors.YELLOW}日志级别:{Colors.CYAN} {Colors.GREEN}{LOG_LEVEL}{Colors.CYAN}                     |{Colors.ENDC}
+{Colors.CYAN}|  {Colors.YELLOW}日志级别:{Colors.CYAN} {Colors.GREEN}{LOGLEVEL}{Colors.CYAN}                     |{Colors.ENDC}
 {Colors.CYAN}|  {Colors.YELLOW}热重载:  {Colors.CYAN} {Colors.GREEN}{reload_str}{Colors.CYAN}                       |{Colors.ENDC}
 {Colors.CYAN}+----------------------------------------+{Colors.ENDC}
 """
@@ -94,7 +113,7 @@ def main():
         port=PORT, 
         reload=RELOAD,
         workers=WORKERS if not RELOAD else 1,  # reload模式下只能使用1个worker
-        log_level=LOG_LEVEL
+        log_level=LOGLEVEL
     )
 
 if __name__ == "__main__":

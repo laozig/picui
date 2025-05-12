@@ -209,14 +209,40 @@ PicUI使用会话Cookie进行用户身份识别，主要特点：
 |---------|------|-------|
 | `SESSION_CLEANUP_INTERVAL` | 会话清理间隔（秒） | 3600 |
 
-## 代码清理
+## 代码清理与优化
 
-项目已清理以下内容：
+项目已进行以下优化：
 
 - 删除了测试文件 (`run_tests.py`, `test_main.py`, `pytest.ini`)
 - 删除了测试页面路由 `/test` 和相关模板 `simple_index.html`
 - 删除了旧版备份文件 `main.py.old`
 - 优化了文件组织结构，移除了未使用的模块
+- 增强了数据库兼容性，自动处理表结构不匹配问题
+- 添加了数据库结构自动升级功能，支持平滑迁移
+
+## 数据库兼容性
+
+系统现在能够自动处理数据库表结构变更：
+
+1. 启动时会自动检测并尝试添加缺失的数据库列
+2. 即使数据库结构与模型定义不完全匹配，应用也能正常工作
+3. 上传图片、创建短链接等功能都有完善的错误处理机制
+4. 在迁移到新版本时不需要手动修改数据库结构
+
+### 已修复的数据库问题
+
+- `images`表缺少`file_size`和`upload_ip`列，现已自动添加
+- `upload_logs`表缺少`saved_filename`和`file_size`列，现已自动添加
+- `short_links`表缺少`is_enabled`列，现已自动添加
+
+如果应用启动时仍有数据库结构警告，可以执行以下命令手动修复：
+
+```python
+python -c "from src.database import upgrade_database; upgrade_database()"
+```
+
+最近修复记录：
+- 2023-05-12: 添加 `upload_ip` 列到 `images` 表
 
 ## API接口
 

@@ -7,6 +7,8 @@ import os
 import secrets
 import string
 import random
+import logging
+import sqlite3
 
 # 数据库配置
 # 默认使用SQLite，但也可以通过环境变量使用其他数据库
@@ -33,7 +35,7 @@ class Image(Base):
     id = Column(Integer, primary_key=True, index=True)
     filename = Column(String, unique=True, index=True)
     original_filename = Column(String)
-    file_size = Column(Float)  # 单位：KB
+    file_size = Column(Float, nullable=True)  # 单位：KB，允许为空
     upload_time = Column(DateTime, default=func.now())
     upload_ip = Column(String)
     user_id = Column(String, index=True, nullable=True)  # 添加用户ID字段
@@ -73,7 +75,7 @@ class ShortLink(Base):
     created_at = Column(DateTime, default=func.now())
     access_count = Column(Integer, default=0)  # 访问计数
     expire_at = Column(DateTime, nullable=True)  # 过期时间，为null则永不过期
-    is_enabled = Column(Boolean, default=True)
+    is_enabled = Column(Boolean, default=True, nullable=True)  # 设置默认值为True，允许为空
     user_id = Column(String, index=True, nullable=True)  # 添加用户ID字段
     
     def is_expired(self):
@@ -97,7 +99,92 @@ class ShortLink(Base):
 
 # 创建数据库表
 def create_tables():
-    Base.metadata.create_all(bind=engine)
+    """创建或更新数据库表结构
+    
+    会根据模型定义创建表，如果表不存在则会安全地更新表结构
+    """
+    logger = logging.getLogger("picui")
+    
+    try:
+        # 安全地创建表，如果表不存在
+        Base.metadata.create_all(bind=engine)
+        logger.info("✓ 数据库表结构已创建或更新")
+    except Exception as e:
+        logger.error(f"数据库表结构创建失败: {str(e)}", exc_info=True)
+        raise
+
+# 升级数据库结构，添加缺失的列
+def upgrade_database():
+    """升级数据库表结构，添加缺失的列"""
+    logger = logging.getLogger("picui")
+    
+    try:
+        # 从DATABASE_URL中提取数据库文件路径
+        db_path = "picui.db"
+        if DATABASE_URL.startswith("sqlite:///"):
+            db_path = DATABASE_URL.replace("sqlite:///", "").replace("./", "")
+        
+        # 连接数据库
+        conn = sqlite3.connect(db_path)
+        cursor = conn.cursor()
+        
+        # 记录已添加的列
+        added_columns = []
+        
+        # 尝试添加upload_ip列到images表
+        try:
+            cursor.execute("ALTER TABLE images ADD COLUMN upload_ip TEXT;")
+            added_columns.append("images.upload_ip")
+        except sqlite3.OperationalError as e:
+            if "duplicate column name" not in str(e).lower():
+                logger.debug(f"无法添加 upload_ip 列到 images 表: {str(e)}")
+                
+        # 尝试添加file_size列到images表
+        try:
+            cursor.execute("ALTER TABLE images ADD COLUMN file_size FLOAT;")
+            added_columns.append("images.file_size")
+        except sqlite3.OperationalError as e:
+            if "duplicate column name" not in str(e).lower():
+                logger.debug(f"无法添加 file_size 列到 images 表: {str(e)}")
+        
+        # 尝试添加is_enabled列到short_links表
+        try:
+            cursor.execute("ALTER TABLE short_links ADD COLUMN is_enabled BOOLEAN DEFAULT 1;")
+            added_columns.append("short_links.is_enabled")
+        except sqlite3.OperationalError as e:
+            if "duplicate column name" not in str(e).lower():
+                logger.debug(f"无法添加 is_enabled 列到 short_links 表: {str(e)}")
+        
+        # 尝试添加saved_filename列到upload_logs表
+        try:
+            cursor.execute("ALTER TABLE upload_logs ADD COLUMN saved_filename TEXT;")
+            added_columns.append("upload_logs.saved_filename")
+        except sqlite3.OperationalError as e:
+            if "duplicate column name" not in str(e).lower():
+                logger.debug(f"无法添加 saved_filename 列到 upload_logs 表: {str(e)}")
+        
+        # 尝试添加file_size列到upload_logs表
+        try:
+            cursor.execute("ALTER TABLE upload_logs ADD COLUMN file_size FLOAT;")
+            added_columns.append("upload_logs.file_size")
+        except sqlite3.OperationalError as e:
+            if "duplicate column name" not in str(e).lower():
+                logger.debug(f"无法添加 file_size 列到 upload_logs 表: {str(e)}")
+        
+        # 提交更改
+        conn.commit()
+        conn.close()
+        
+        # 只在有新增列时输出日志
+        if added_columns:
+            logger.info(f"✓ 数据库升级完成，已添加列: {', '.join(added_columns)}")
+        else:
+            logger.debug("✓ 数据库升级完成，未添加新列")
+            
+        return True
+    except Exception as e:
+        logger.error(f"数据库升级失败: {str(e)}")
+        return False
 
 # 获取数据库会话
 def get_db():
@@ -109,4 +196,7 @@ def get_db():
 
 # 如果数据库文件不存在，则创建表
 if not os.path.exists("picui.db"):
-    create_tables() 
+    create_tables()
+# 尝试升级数据库结构
+else:
+    upgrade_database() 

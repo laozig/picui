@@ -113,49 +113,73 @@ async def manage_short_links(
     db: Session = Depends(get_db)
 ):
     """渲染短链接管理页面"""
-    # 获取或创建会话
-    _, user_id = get_or_create_session(request, response)
-    
-    # 计算偏移量
-    offset = (page - 1) * limit
-    
-    # 构建查询 - 只查询当前用户上传的图片相关的短链接
-    query = db.query(ShortLink).join(
-        Image, ShortLink.target_file == Image.filename
-    ).filter(Image.user_id == user_id)
-    
-    # 添加搜索条件
-    if search:
-        query = query.filter(
-            ShortLink.code.contains(search) | 
-            ShortLink.target_file.contains(search) |
-            Image.original_filename.contains(search)
+    try:
+        # 获取或创建会话
+        _, user_id = get_or_create_session(request, response)
+        
+        # 计算偏移量
+        offset = (page - 1) * limit
+        
+        # 构建查询 - 只查询当前用户上传的图片相关的短链接
+        query = db.query(ShortLink).join(
+            Image, ShortLink.target_file == Image.filename
+        ).filter(Image.user_id == user_id)
+        
+        # 添加搜索条件
+        if search:
+            query = query.filter(
+                ShortLink.code.contains(search) | 
+                ShortLink.target_file.contains(search) |
+                Image.original_filename.contains(search)
+            )
+        
+        try:
+            # 获取总数
+            total = query.count()
+            
+            # 分页并获取结果
+            short_links = query.order_by(ShortLink.created_at.desc()).offset(offset).limit(limit).all()
+            
+            # 计算总页数
+            total_pages = (total + limit - 1) // limit
+        except Exception as db_error:
+            logger.error(f"查询短链接数据时出错: {str(db_error)}", exc_info=True)
+            # 如果发生错误，使用空数据
+            short_links = []
+            total = 0
+            total_pages = 1
+        
+        # 渲染模板
+        return templates.TemplateResponse(
+            "short_links.html",
+            {
+                "request": request,
+                "short_links": short_links,
+                "page": page,
+                "total_pages": total_pages,
+                "total": total,
+                "limit": limit,
+                "search": search,
+                "now": datetime.now(),
+                "max": max,  # 提供内置的max函数
+                "min": min   # 提供内置的min函数
+            }
         )
-    
-    # 获取总数
-    total = query.count()
-    
-    # 分页并获取结果
-    short_links = query.order_by(ShortLink.created_at.desc()).offset(offset).limit(limit).all()
-    
-    # 计算总页数
-    total_pages = (total + limit - 1) // limit
-    
-    # 渲染模板
-    return templates.TemplateResponse(
-        "short_links.html",
-        {
-            "request": request,
-            "short_links": short_links,
-            "page": page,
-            "total_pages": total_pages,
-            "total": total,
-            "limit": limit,
-            "search": search,
-            "now": datetime.now(),
-            "max": max,  # 提供内置的max函数
-            "min": min   # 提供内置的min函数
-        }
-    )
+    except Exception as e:
+        logger.error(f"短链接管理页面访问出错: {str(e)}", exc_info=True)
+        # 返回简单的错误页面
+        return HTMLResponse(
+            content=f"""
+            <html>
+                <head><title>发生错误</title></head>
+                <body>
+                    <h1>访问出错</h1>
+                    <p>系统在处理您的请求时遇到了问题。错误信息: {str(e)}</p>
+                    <a href="/admin">返回管理面板</a>
+                </body>
+            </html>
+            """,
+            status_code=500
+        )
 
 # 删除了测试页面路由 
